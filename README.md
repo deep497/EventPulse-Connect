@@ -23,9 +23,3 @@ EventPulse is a modern, offline-first Android application built for personalized
 ### Prerequisites
 *   Android Studio (Latest Release)
 *   JDK 17+
-
-### Installation
-
-1. Clone the repository:
-   ```bash
-   git clone [https://github.com/yourusername/EventPulse-Android.git](https://github.com/yourusername/EventPulse-Android.git)
