@@ -13,3 +13,11 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Environment files
+.env
+backend/.env
+backend/node_modules/
+
+# Keystore
+keystore.properties

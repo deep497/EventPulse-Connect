@@ -1,0 +1,144 @@
+package com.example.eventpulse.ui.user
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.eventpulse.data.model.Booking
+import com.example.eventpulse.data.model.Event
+import com.example.eventpulse.data.repository.BookingRepository
+import com.example.eventpulse.data.repository.EventRepository
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+
+data class UserUiState(
+    val locationText: String = "Current Location",
+    val searchQuery: String = "",
+    val selectedCategory: String = "All",
+    val categories: List<String> = listOf("All", "Music", "Tech", "Art", "Sports"),
+    val recommendedEvents: List<Event> = emptyList(),
+    val selectedEvent: Event? = null,
+    val bookings: List<Booking> = emptyList(),
+    val isLoading: Boolean = false,
+    val errorMessage: String? = null
+)
+
+class UserViewModel(
+    private val eventRepository: EventRepository,
+    private val bookingRepository: BookingRepository
+) : ViewModel() {
+
+    private val _userUiState = MutableStateFlow(UserUiState())
+    val userUiState: StateFlow<UserUiState> = _userUiState.asStateFlow()
+
+    init {
+        loadEvents()
+    }
+
+    fun updateSearchQuery(query: String) {
+        _userUiState.update { it.copy(searchQuery = query) }
+        // TODO: Implement search filtering
+    }
+
+    fun updateSelectedCategory(category: String) {
+        _userUiState.update { it.copy(selectedCategory = category) }
+        // TODO: Implement category filtering
+    }
+
+    fun updateLocation(location: String) {
+        _userUiState.update { it.copy(locationText = location) }
+    }
+
+    fun loadEvents() {
+        viewModelScope.launch {
+            _userUiState.update { it.copy(isLoading = true, errorMessage = null) }
+            
+            val result = eventRepository.getEvents()
+            result.fold(
+                onSuccess = { events ->
+                    _userUiState.update { it.copy(
+                        isLoading = false,
+                        recommendedEvents = events
+                    )}
+                },
+                onFailure = { exception ->
+                    _userUiState.update { it.copy(
+                        isLoading = false,
+                        errorMessage = exception.message ?: "Failed to load events"
+                    )}
+                }
+            )
+        }
+    }
+
+    fun loadEventById(eventId: String) {
+        viewModelScope.launch {
+            _userUiState.update { it.copy(isLoading = true, errorMessage = null) }
+            
+            val result = eventRepository.getEventById(eventId)
+            result.fold(
+                onSuccess = { event ->
+                    _userUiState.update { it.copy(
+                        isLoading = false,
+                        selectedEvent = event
+                    )}
+                },
+                onFailure = { exception ->
+                    _userUiState.update { it.copy(
+                        isLoading = false,
+                        errorMessage = exception.message ?: "Failed to load event"
+                    )}
+                }
+            )
+        }
+    }
+
+    fun loadBookings() {
+        viewModelScope.launch {
+            _userUiState.update { it.copy(isLoading = true, errorMessage = null) }
+            
+            val result = bookingRepository.getBookings()
+            result.fold(
+                onSuccess = { bookings ->
+                    _userUiState.update { it.copy(
+                        isLoading = false,
+                        bookings = bookings
+                    )}
+                },
+                onFailure = { exception ->
+                    _userUiState.update { it.copy(
+                        isLoading = false,
+                        errorMessage = exception.message ?: "Failed to load bookings"
+                    )}
+                }
+            )
+        }
+    }
+
+    fun createBooking(eventId: String, ticketCount: Int) {
+        viewModelScope.launch {
+            _userUiState.update { it.copy(isLoading = true, errorMessage = null) }
+            
+            val result = bookingRepository.createBooking(eventId, ticketCount)
+            result.fold(
+                onSuccess = { booking ->
+                    _userUiState.update { it.copy(
+                        isLoading = false,
+                        bookings = it.bookings + booking
+                    )}
+                },
+                onFailure = { exception ->
+                    _userUiState.update { it.copy(
+                        isLoading = false,
+                        errorMessage = exception.message ?: "Failed to create booking"
+                    )}
+                }
+            )
+        }
+    }
+
+    fun clearError() {
+        _userUiState.update { it.copy(errorMessage = null) }
+    }
+}
