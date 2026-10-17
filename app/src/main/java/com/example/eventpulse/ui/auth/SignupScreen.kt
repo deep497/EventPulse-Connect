@@ -3,25 +3,24 @@ package com.example.eventpulse.ui.auth
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.res.painterResource
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -39,10 +38,10 @@ fun SignupScreen(
     LaunchedEffect(uiState.isAuthenticated, uiState.userRole) {
         if (uiState.isAuthenticated && uiState.userRole != null) {
             val destination = when (uiState.userRole) {
-                Role.USER -> Screen.UserHome.route
-                Role.ORGANIZER -> Screen.OrganizerDashboard.route
-                Role.ADMIN -> Screen.AdminDashboard.route
-                else -> Screen.UserHome.route
+                Role.USER -> Screen.UserExplore.route
+                Role.ORGANIZER -> Screen.OrgDashboard.route
+                Role.ADMIN -> Screen.AdminModeration.route
+                else -> Screen.UserExplore.route
             }
             navController.navigate(destination) {
                 popUpTo(Screen.Signup.route) { inclusive = true }
@@ -111,7 +110,12 @@ fun SignupScreen(
                     value = uiState.fullName,
                     onValueChange = { viewModel.updateFullName(it) },
                     label = { Text("Full Name") },
-                    leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                    leadingIcon = { 
+                        Icon(
+                            painter = painterResource(id = android.R.drawable.ic_menu_myplaces),
+                            contentDescription = null
+                        ) 
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     enabled = !uiState.isLoading
@@ -124,7 +128,12 @@ fun SignupScreen(
                     value = uiState.email,
                     onValueChange = { viewModel.updateEmail(it) },
                     label = { Text("Email") },
-                    leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
+                    leadingIcon = { 
+                        Icon(
+                            painter = painterResource(id = android.R.drawable.ic_dialog_email),
+                            contentDescription = null
+                        ) 
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     enabled = !uiState.isLoading
@@ -133,13 +142,30 @@ fun SignupScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Password Field
+                var passwordVisible by remember { mutableStateOf(false) }
+
                 OutlinedTextField(
                     value = uiState.password,
                     onValueChange = { viewModel.updatePassword(it) },
                     label = { Text("Password") },
-
-                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                    visualTransformation = PasswordVisualTransformation(),
+                    leadingIcon = { 
+                        Icon(
+                            painter = painterResource(id = android.R.drawable.ic_secure),
+                            contentDescription = null
+                        ) 
+                    },
+                    trailingIcon = {
+                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                            Icon(
+                                painter = painterResource(
+                                    id = if (passwordVisible) android.R.drawable.ic_menu_view 
+                                         else android.R.drawable.ic_secure
+                                ),
+                                contentDescription = if (passwordVisible) "Hide password" else "Show password"
+                            )
+                        }
+                    },
+                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     enabled = !uiState.isLoading

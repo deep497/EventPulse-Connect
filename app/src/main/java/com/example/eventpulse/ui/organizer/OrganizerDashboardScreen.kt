@@ -3,12 +3,9 @@ package com.example.eventpulse.ui.organizer
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
-import androidx.compose.material3.Box
+//import androidx.compose.material3.Box
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -19,10 +16,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.PaddingValues
+//import androidx.compose.material3.PaddingValues
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.ui.res.painterResource
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,6 +31,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.eventpulse.data.model.Event
 import com.example.eventpulse.ui.navigation.Screen
 
+import androidx.compose.material3.ExtendedFloatingActionButton
+import com.example.eventpulse.ui.chat.AiChatBottomSheet
+import com.example.eventpulse.ui.chatViewModel
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OrganizerDashboardScreen(
@@ -40,6 +42,8 @@ fun OrganizerDashboardScreen(
     viewModel: OrganizerViewModel
 ) {
     val uiState by viewModel.organizerUiState.collectAsStateWithLifecycle()
+    var showAiCoPilot by remember { mutableStateOf(false) }
+    val chatVm = chatViewModel()
 
     Scaffold(
         topBar = {
@@ -48,13 +52,45 @@ fun OrganizerDashboardScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { navController.navigate(Screen.CreateEditEvent.createRoute()) }
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Create Event")
+                ExtendedFloatingActionButton(
+                    onClick = { showAiCoPilot = true },
+                    icon = {
+                        Icon(
+                            painter = painterResource(id = android.R.drawable.ic_dialog_info),
+                            contentDescription = "AI Co-Pilot"
+                        )
+                    },
+                    text = { Text("AI Co-Pilot") },
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                )
+
+                FloatingActionButton(
+                    onClick = { navController.navigate(Screen.CreateEditEvent.createRoute()) }
+                ) {
+                    Icon(
+                        painter = painterResource(id = android.R.drawable.ic_input_add),
+                        contentDescription = "Create Event"
+                    )
+                }
             }
         }
     ) { paddingValues ->
+        if (showAiCoPilot) {
+            AiChatBottomSheet(
+                role = "ORGANIZER",
+                onDismiss = { showAiCoPilot = false },
+                viewModel = chatVm,
+                onUseSuggestion = { suggestion ->
+                    showAiCoPilot = false
+                    navController.navigate(Screen.CreateEditEvent.createRoute())
+                }
+            )
+        }
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -115,7 +151,7 @@ fun OrganizerDashboardScreen(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Add,
+                                painter = painterResource(id = android.R.drawable.ic_input_add),
                                 contentDescription = null,
                                 modifier = Modifier.size(32.dp),
                                 tint = MaterialTheme.colorScheme.primary
@@ -140,7 +176,7 @@ fun OrganizerDashboardScreen(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Icon(
-                                imageVector = Icons.Default.QrCodeScanner,
+                                painter = painterResource(id = android.R.drawable.ic_menu_camera),
                                 contentDescription = null,
                                 modifier = Modifier.size(32.dp),
                                 tint = MaterialTheme.colorScheme.primary

@@ -1,50 +1,92 @@
 package com.example.eventpulse.data.remote
 
 import com.example.eventpulse.data.model.Booking
+import com.example.eventpulse.data.model.ChatRequest
+import com.example.eventpulse.data.model.ChatResponse
 import com.example.eventpulse.data.model.Event
 import com.example.eventpulse.data.model.User
 import retrofit2.Response
 import retrofit2.http.*
 
 interface EventPulseApi {
-    
-    // Auth endpoints
-    @POST("auth/register")
-    suspend fun register(@Body body: Map<String, String>): Response<User>
 
+    // ── Auth endpoints ──────────────────────────────────────────────────────────
+    /** POST /api/auth/register – returns { token, user } */
+    @POST("auth/register")
+    suspend fun register(@Body body: Map<String, String>): Response<Map<String, Any>>
+
+    /** POST /api/auth/login – returns { token, user: { id, name, email, role } } */
     @POST("auth/login")
     suspend fun login(@Body body: Map<String, String>): Response<Map<String, Any>>
 
-    // Event endpoints
+    // ── Event endpoints ─────────────────────────────────────────────────────────
+    /** GET /api/events?status=&category=&search= */
     @GET("events")
-    suspend fun getEvents(): Response<List<Event>>
+    suspend fun getEvents(
+        @Query("status") status: String? = null,
+        @Query("category") category: String? = null,
+        @Query("search") search: String? = null
+    ): Response<List<Event>>
 
+    /** GET /api/events/organizer – organizer's own events */
+    @GET("events/organizer")
+    suspend fun getOrganizerEvents(): Response<List<Event>>
+
+    /** GET /api/events/:id */
     @GET("events/{id}")
     suspend fun getEventById(@Path("id") eventId: String): Response<Event>
 
+    /** POST /api/events – creates with status=PENDING_APPROVAL */
     @POST("events")
     suspend fun createEvent(@Body event: Event): Response<Event>
 
+    /** PUT /api/events/:id */
     @PUT("events/{id}")
     suspend fun updateEvent(@Path("id") eventId: String, @Body event: Event): Response<Event>
 
+    /** DELETE /api/events/:id */
     @DELETE("events/{id}")
     suspend fun deleteEvent(@Path("id") eventId: String): Response<Unit>
 
-    // Booking endpoints
+    // ── Admin endpoints ─────────────────────────────────────────────────────────
+    /** GET /api/admin/pending-events */
+    @GET("admin/pending-events")
+    suspend fun getPendingEvents(): Response<List<Event>>
+
+    /** PATCH /api/admin/events/:id/status – body: { status: "PUBLISHED"|"REJECTED" } */
+    @PATCH("admin/events/{id}/status")
+    suspend fun updateEventStatus(
+        @Path("id") eventId: String,
+        @Body body: Map<String, String>
+    ): Response<Event>
+
+    /** GET /api/admin/metrics */
+    @GET("admin/metrics")
+    suspend fun getAdminMetrics(): Response<Map<String, Any>>
+
+    // ── Booking & Check-in endpoints ────────────────────────────────────────────
+    /** GET /api/bookings/my-tickets */
+    @GET("bookings/my-tickets")
+    suspend fun getMyTickets(): Response<List<Booking>>
+
+    /** GET /api/bookings */
     @GET("bookings")
     suspend fun getBookings(): Response<List<Booking>>
 
+    /** GET /api/bookings/:id */
     @GET("bookings/{id}")
     suspend fun getBookingById(@Path("id") bookingId: String): Response<Booking>
 
+    /** POST /api/bookings – body: { eventId, ticketCount } */
     @POST("bookings")
-    suspend fun createBooking(@Body booking: Map<String, Any>): Response<Booking>
+    suspend fun createBooking(@Body body: Map<String, Any>): Response<Booking>
 
-    @POST("bookings/{id}/verify")
-    suspend fun verifyBooking(@Path("id") bookingId: String): Response<Map<String, Any>>
+    /** POST /api/organizer/check-in – body: { qrCodeHash } */
+    @POST("organizer/check-in")
+    suspend fun checkIn(@Body body: Map<String, String>): Response<Map<String, Any>>
 
-    // Chat endpoints
+    // ── Chat / Gemini proxy ─────────────────────────────────────────────────────
+    /** POST /api/chat – body: ChatRequest, returns ChatResponse */
     @POST("chat")
-    suspend fun sendChatMessage(@Body message: Map<String, String>): Response<Map<String, String>>
+    suspend fun sendChatMessage(@Body request: ChatRequest): Response<ChatResponse>
 }

@@ -18,6 +18,8 @@ class SessionManager(private val context: Context) {
         private val JWT_TOKEN_KEY = stringPreferencesKey("jwt_token")
         private val USER_ROLE_KEY = stringPreferencesKey("user_role")
         private val USER_ID_KEY = stringPreferencesKey("user_id")
+        private val USER_NAME_KEY = stringPreferencesKey("user_name")
+        private val USER_EMAIL_KEY = stringPreferencesKey("user_email")
     }
 
     suspend fun saveJwtToken(token: String) {
@@ -53,6 +55,25 @@ class SessionManager(private val context: Context) {
     fun getUserId(): Flow<String?> {
         return context.dataStore.data.map { preferences ->
             preferences[USER_ID_KEY]
+        }
+    }
+
+    suspend fun saveUserDetails(name: String, email: String) {
+        context.dataStore.edit { preferences ->
+            preferences[USER_NAME_KEY] = name
+            preferences[USER_EMAIL_KEY] = email
+        }
+    }
+
+    fun getUserName(): Flow<String?> {
+        return context.dataStore.data.map { preferences ->
+            preferences[USER_NAME_KEY]
+        }
+    }
+
+    fun getUserEmail(): Flow<String?> {
+        return context.dataStore.data.map { preferences ->
+            preferences[USER_EMAIL_KEY]
         }
     }
 

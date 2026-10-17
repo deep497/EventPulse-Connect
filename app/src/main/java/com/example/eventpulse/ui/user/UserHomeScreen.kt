@@ -4,11 +4,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Box
+//import androidx.compose.material3.Box
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -17,10 +14,11 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.PaddingValues
+//import androidx.compose.material3.PaddingValues
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.ui.res.painterResource
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,6 +29,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.eventpulse.data.model.Event
 import com.example.eventpulse.ui.navigation.Screen
 
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.ExtendedFloatingActionButton
+import com.example.eventpulse.ui.chat.AiChatBottomSheet
+import com.example.eventpulse.ui.chatViewModel
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UserHomeScreen(
@@ -38,6 +41,8 @@ fun UserHomeScreen(
     viewModel: UserViewModel
 ) {
     val uiState by viewModel.userUiState.collectAsStateWithLifecycle()
+    var showAiChat by remember { mutableStateOf(false) }
+    val chatVm = chatViewModel()
 
     Scaffold(
         topBar = {
@@ -48,7 +53,7 @@ fun UserHomeScreen(
                         modifier = Modifier.padding(vertical = 4.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.LocationOn,
+                            painter = painterResource(id = android.R.drawable.ic_menu_mylocation),
                             contentDescription = null,
                             modifier = Modifier.size(20.dp)
                         )
@@ -60,8 +65,29 @@ fun UserHomeScreen(
                     }
                 }
             )
+        },
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                onClick = { showAiChat = true },
+                icon = {
+                    Icon(
+                        painter = painterResource(id = android.R.drawable.ic_dialog_info),
+                        contentDescription = "AI Assistant"
+                    )
+                },
+                text = { Text("AI Assistant") },
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            )
         }
     ) { paddingValues ->
+        if (showAiChat) {
+            AiChatBottomSheet(
+                role = "USER",
+                onDismiss = { showAiChat = false },
+                viewModel = chatVm
+            )
+        }
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -86,7 +112,10 @@ fun UserHomeScreen(
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = { Text("Search events...") },
                     leadingIcon = {
-                        Icon(Icons.Default.Search, contentDescription = null)
+                        Icon(
+                            painter = painterResource(id = android.R.drawable.ic_menu_search),
+                            contentDescription = null
+                        )
                     },
                     singleLine = true
                 )
@@ -195,7 +224,7 @@ fun EventCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    imageVector = Icons.Default.LocationOn,
+                    painter = painterResource(id = android.R.drawable.ic_menu_mylocation),
                     contentDescription = null,
                     modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant

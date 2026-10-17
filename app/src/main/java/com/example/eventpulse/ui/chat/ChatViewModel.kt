@@ -7,38 +7,78 @@ import com.example.eventpulse.data.repository.ChatRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-data class ChatState(
+data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val role: String = "USER", // "USER" or "ORGANIZER"
+    val quickSuggestions: List<String> = emptyList(),
+    val draftContext: Map<String, Any>? = null
 )
 
 class ChatViewModel(
     private val chatRepository: ChatRepository
 ) : ViewModel() {
 
-    private val _chatState = MutableStateFlow(ChatState())
-    val chatState: StateFlow<ChatState> = _chatState.asStateFlow()
+    private val _chatUiState = MutableStateFlow(ChatUiState())
+    val chatUiState: StateFlow<ChatUiState> = _chatUiState.asStateFlow()
+
+    fun setRole(role: String, draftContext: Map<String, Any>? = null) {
+        val suggestions = if (role == "ORGANIZER") {
+            listOf(
+                "Suggest a catchy title & price for a coding bootcamp",
+                "Write a 2-paragraph concert description",
+                "What is a competitive price for a weekend comedy show?",
+                "Suggest an event schedule for a full-day tech conference"
+            )
+        } else {
+            listOf(
+                "Weekend music events",
+                "Free tech workshops",
+                "Outdoor sports and fitness activities",
+                "Popular events under ₹500"
+            )
+        }
+        _chatUiState.update { 
+            it.copy(
+                role = role, 
+                quickSuggestions = suggestions,
+                draftContext = draftContext
+            ) 
+        }
+    }
 
     fun sendMessage(content: String) {
         if (content.isBlank()) return
 
-        // Add user message
         val userMessage = ChatMessage(
-            content = content,
+            content = content.trim(),
             isFromUser = true,
             timestamp = System.currentTimeMillis()
         )
-        _chatState.value = _chatState.value.copy(
-            messages = _chatState.value.messages + userMessage
-        )
+        
+        val currentHistory = _chatUiState.value.messages
+        val currentRole = _chatUiState.value.role
+        val currentDraft = _chatUiState.value.draftContext
+
+        _chatUiState.update {
+            it.copy(
+                messages = it.messages + userMessage,
+                isLoading = true,
+                error = null
+            )
+        }
 
         viewModelScope.launch {
-            _chatState.value = _chatState.value.copy(isLoading = true, error = null)
-            
-            val result = chatRepository.sendMessage(content)
+            val result = chatRepository.sendMessage(
+                message = content.trim(),
+                role = currentRole,
+                history = currentHistory,
+                draftContext = currentDraft
+            )
             result.fold(
                 onSuccess = { reply ->
                     val aiMessage = ChatMessage(
@@ -46,26 +86,30 @@ class ChatViewModel(
                         isFromUser = false,
                         timestamp = System.currentTimeMillis()
                     )
-                    _chatState.value = _chatState.value.copy(
-                        isLoading = false,
-                        messages = _chatState.value.messages + aiMessage
-                    )
+                    _chatUiState.update {
+                        it.copy(
+                            isLoading = false,
+                            messages = it.messages + aiMessage
+                        )
+                    }
                 },
                 onFailure = { exception ->
-                    _chatState.value = _chatState.value.copy(
-                        isLoading = false,
-                        error = exception.message ?: "Failed to send message"
-                    )
+                    _chatUiState.update {
+                        it.copy(
+                            isLoading = false,
+                            error = exception.message ?: "Failed to get response"
+                        )
+                    }
                 }
             )
         }
     }
 
     fun clearMessages() {
-        _chatState.value = ChatState()
+        _chatUiState.update { it.copy(messages = emptyList(), error = null) }
     }
 
     fun clearError() {
-        _chatState.value = _chatState.value.copy(error = null)
+        _chatUiState.update { it.copy(error = null) }
     }
 }

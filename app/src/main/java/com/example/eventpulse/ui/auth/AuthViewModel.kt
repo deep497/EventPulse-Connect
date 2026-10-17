@@ -8,6 +8,7 @@ import com.example.eventpulse.data.repository.AuthRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -36,21 +37,25 @@ class AuthViewModel(
 
     private fun checkAuthStatus() {
         viewModelScope.launch {
-            authRepository.getJwtToken().collect { token ->
-                if (token != null) {
-                    // Get user role from session
-                    authRepository.getUserRole().collect { role ->
-                        _authUiState.update { it.copy(
-                            isAuthenticated = true,
-                            userRole = role
-                        )}
-                    }
-                } else {
-                    _authUiState.update { it.copy(
-                        isAuthenticated = false,
-                        userRole = null
-                    )}
-                }
+            combine(
+                authRepository.getJwtToken(),
+                authRepository.getUserRole(),
+                authRepository.getUserName(),
+                authRepository.getUserEmail()
+            ) { token, role, name, email -> 
+                listOf(token, role, name, email) 
+            }.collect { list ->
+                val token = list[0] as? String
+                val role = list[1] as? Role
+                val name = list[2] as? String
+                val email = list[3] as? String
+
+                _authUiState.update { it.copy(
+                    isAuthenticated = token != null,
+                    userRole = if (token != null) role else null,
+                    fullName = name ?: it.fullName,
+                    email = email ?: it.email
+                )}
             }
         }
     }

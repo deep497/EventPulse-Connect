@@ -138,27 +138,34 @@ class OrganizerViewModel(
         }
     }
 
-    fun verifyBooking(bookingId: String) {
+    /**
+     * Performs QR check-in via POST /api/organizer/check-in.
+     * @param qrCodeHash SHA-256 hash scanned from the attendee's ticket QR code.
+     */
+    fun checkIn(qrCodeHash: String) {
         viewModelScope.launch {
             _organizerUiState.update { it.copy(isLoading = true, errorMessage = null) }
-            
-            val result = bookingRepository.verifyBooking(bookingId)
+
+            val result = bookingRepository.checkIn(qrCodeHash)
             result.fold(
-                onSuccess = { data ->
+                onSuccess = {
                     _organizerUiState.update { it.copy(
                         isLoading = false,
-                        successMessage = "Booking verified successfully"
+                        successMessage = "Attendee checked in successfully"
                     )}
                 },
                 onFailure = { exception ->
                     _organizerUiState.update { it.copy(
                         isLoading = false,
-                        errorMessage = exception.message ?: "Failed to verify booking"
+                        errorMessage = exception.message ?: "Check-in failed"
                     )}
                 }
             )
         }
     }
+
+    /** Legacy alias kept for any call sites that still use the old name. */
+    fun verifyBooking(qrCodeHash: String) = checkIn(qrCodeHash)
 
     fun clearMessages() {
         _organizerUiState.update { it.copy(

@@ -6,16 +6,17 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.example.eventpulse.ui.admin.AdminDashboardScreen
+import com.example.eventpulse.ui.admin.AdminMainScreen
 import com.example.eventpulse.ui.auth.LoginScreen
 import com.example.eventpulse.ui.auth.SignupScreen
+import com.example.eventpulse.ui.authViewModel
+import com.example.eventpulse.ui.userViewModel
+import com.example.eventpulse.ui.organizerViewModel
 import com.example.eventpulse.ui.organizer.CreateEditEventScreen
-import com.example.eventpulse.ui.organizer.OrganizerDashboardScreen
+import com.example.eventpulse.ui.organizer.OrganizerMainScreen
 import com.example.eventpulse.ui.organizer.QrScannerScreen
 import com.example.eventpulse.ui.user.EventDetailScreen
-import com.example.eventpulse.ui.user.MyTicketsScreen
-import com.example.eventpulse.ui.user.UserHomeScreen
-import com.example.eventpulse.ui.eventPulseViewModel
+import com.example.eventpulse.ui.user.UserMainScreen
 
 @Composable
 fun AppNavGraph(
@@ -30,25 +31,23 @@ fun AppNavGraph(
         composable(Screen.Login.route) {
             LoginScreen(
                 navController = navController,
-                viewModel = eventPulseViewModel()
+                viewModel = authViewModel()
             )
         }
         
         composable(Screen.Signup.route) {
             SignupScreen(
                 navController = navController,
-                viewModel = eventPulseViewModel()
+                viewModel = authViewModel()
             )
         }
 
-        // User screens
-        composable(Screen.UserHome.route) {
-            UserHomeScreen(
-                navController = navController,
-                viewModel = eventPulseViewModel()
-            )
+        // User main screen with bottom nav
+        composable(Screen.UserExplore.route) {
+            UserMainScreen(parentNavController = navController)
         }
 
+        // User detail screens (without bottom nav)
         composable(
             route = Screen.EventDetail.route,
             arguments = listOf(navArgument("eventId") { type = NavType.StringType })
@@ -57,25 +56,16 @@ fun AppNavGraph(
             EventDetailScreen(
                 navController = navController,
                 eventId = eventId,
-                viewModel = eventPulseViewModel()
+                viewModel = userViewModel()
             )
         }
 
-        composable(Screen.MyTickets.route) {
-            MyTicketsScreen(
-                navController = navController,
-                viewModel = eventPulseViewModel()
-            )
+        // Organizer main screen with bottom nav
+        composable(Screen.OrgDashboard.route) {
+            OrganizerMainScreen(parentNavController = navController)
         }
 
-        // Organizer screens
-        composable(Screen.OrganizerDashboard.route) {
-            OrganizerDashboardScreen(
-                navController = navController,
-                viewModel = eventPulseViewModel()
-            )
-        }
-
+        // Organizer detail screens (without bottom nav)
         composable(
             route = Screen.CreateEditEvent.route,
             arguments = listOf(navArgument("eventId") { 
@@ -88,23 +78,20 @@ fun AppNavGraph(
             CreateEditEventScreen(
                 navController = navController,
                 eventId = eventId,
-                viewModel = eventPulseViewModel()
+                viewModel = organizerViewModel()
             )
         }
 
         composable(Screen.QrScanner.route) {
             QrScannerScreen(
                 navController = navController,
-                viewModel = eventPulseViewModel()
+                viewModel = organizerViewModel()
             )
         }
 
-        // Admin screens
-        composable(Screen.AdminDashboard.route) {
-            AdminDashboardScreen(
-                navController = navController,
-                viewModel = eventPulseViewModel()
-            )
+        // Admin main screen with bottom nav
+        composable(Screen.AdminModeration.route) {
+            AdminMainScreen(parentNavController = navController)
         }
     }
 }
