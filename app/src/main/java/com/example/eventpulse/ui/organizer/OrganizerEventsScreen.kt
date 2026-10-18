@@ -48,11 +48,24 @@ fun OrganizerEventsScreen(
         ) {
             if (uiState.managedEvents.isEmpty()) {
                 item {
-                    EmptyEventsState()
+                    com.example.eventpulse.ui.components.GlassCard(modifier = Modifier.fillMaxWidth()) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(28.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "No Events Published Yet",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
             } else {
                 items(uiState.managedEvents) { event ->
-                    ManagedEventCard(
+                    NeonManagedEventCard(
                         event = event,
                         onEditClick = {
                             navController.navigate(Screen.CreateEditEvent.createRoute(event.id))

@@ -20,6 +20,19 @@ class SessionManager(private val context: Context) {
         private val USER_ID_KEY = stringPreferencesKey("user_id")
         private val USER_NAME_KEY = stringPreferencesKey("user_name")
         private val USER_EMAIL_KEY = stringPreferencesKey("user_email")
+        private val DARK_MODE_KEY = androidx.datastore.preferences.core.booleanPreferencesKey("dark_mode")
+    }
+
+    suspend fun setDarkMode(isDark: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[DARK_MODE_KEY] = isDark
+        }
+    }
+
+    fun isDarkMode(): Flow<Boolean?> {
+        return context.dataStore.data.map { preferences ->
+            preferences[DARK_MODE_KEY]
+        }
     }
 
     suspend fun saveJwtToken(token: String) {

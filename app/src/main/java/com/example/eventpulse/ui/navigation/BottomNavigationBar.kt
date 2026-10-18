@@ -1,15 +1,22 @@
 package com.example.eventpulse.ui.navigation
 
-import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Text
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
+import com.example.eventpulse.ui.theme.*
 
 @Composable
 fun BottomNavigationBar(
@@ -18,27 +25,45 @@ fun BottomNavigationBar(
 ) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+    val isDark = LocalThemeIsDark.current
 
-    NavigationBar {
+    NavigationBar(
+        containerColor = if (isDark) DarkGlassCard else LightGlassCard,
+        contentColor = if (isDark) DarkTextPrimary else LightTextPrimary,
+        tonalElevation = 8.dp,
+        modifier = Modifier
+            .border(
+                width = 1.dp,
+                color = if (isDark) DarkGlassBorderStart.copy(alpha = 0.5f) else LightGlassBorder,
+                shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+            )
+            .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+    ) {
         items.forEach { item ->
+            val isSelected = currentRoute == item.route
             NavigationBarItem(
                 icon = { 
                     Icon(
                         painter = painterResource(id = getIconForRoute(item.icon)),
-                        contentDescription = item.title
+                        contentDescription = item.title,
+                        modifier = Modifier.size(22.dp)
                     )
                 },
                 label = { Text(item.title) },
-                selected = currentRoute == item.route,
+                selected = isSelected,
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = if (isDark) NeonCyan else ElectricPurple,
+                    selectedTextColor = if (isDark) NeonCyan else ElectricPurple,
+                    unselectedIconColor = if (isDark) DarkTextTertiary else LightTextTertiary,
+                    unselectedTextColor = if (isDark) DarkTextTertiary else LightTextTertiary,
+                    indicatorColor = if (isDark) Color(0x3300F5D4) else Color(0x337B2CBF)
+                ),
                 onClick = {
                     navController.navigate(item.route) {
-                        // Pop up to the start destination and save state
                         popUpTo(navController.graph.findStartDestination().id) {
                             saveState = true
                         }
-                        // Avoid multiple copies of the same destination
                         launchSingleTop = true
-                        // Restore state when reselecting a previously selected item
                         restoreState = true
                     }
                 }

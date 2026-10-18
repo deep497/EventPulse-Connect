@@ -61,9 +61,11 @@ fun UserFavoritesScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(uiState.recommendedEvents) { event ->
-                        EventCard(
+                        NeonEventCard(
                             event = event,
-                            onClick = { /* Navigate to detail */ }
+                            onClick = {
+                                navController.navigate(com.example.eventpulse.ui.navigation.Screen.EventDetail.createRoute(event.id))
+                            }
                         )
                     }
                 }
