@@ -1,6 +1,7 @@
 package com.example.eventpulse.ui.components
 
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,29 +18,29 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.eventpulse.ui.theme.*
 
 /**
- * Premium glassmorphic container card with glowing border and subtle gradient background.
+ * Premium container card with subtle border and warm shadow (Sunset Coral spec).
  */
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(20.dp),
-    borderBrush: Brush = if (LocalThemeIsDark.current) GlassBorderBrush else Brush.linearGradient(listOf(LightGlassBorder, LightGlassBorder)),
+    borderBrush: Brush = if (LocalThemeIsDark.current) GlassBorderBrush else Brush.linearGradient(listOf(UserLightBorder, UserLightBorder)),
     borderWidth: Dp = 1.dp,
-    containerColor: Color = if (LocalThemeIsDark.current) DarkGlassCard else LightGlassCard,
+    containerColor: Color = if (LocalThemeIsDark.current) DarkGlassCard else Color.White,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Card(
         modifier = modifier
             .shadow(
-                elevation = if (LocalThemeIsDark.current) 12.dp else 4.dp,
+                elevation = if (LocalThemeIsDark.current) 8.dp else 3.dp,
                 shape = shape,
-                spotColor = if (LocalThemeIsDark.current) Color(0x667B2CBF) else Color(0x1A000000)
+                spotColor = if (LocalThemeIsDark.current) Color(0x44DE748F) else Color(0x14000000)
             )
             .border(width = borderWidth, brush = borderBrush, shape = shape),
         shape = shape,
@@ -50,7 +51,7 @@ fun GlassCard(
 }
 
 /**
- * Standard app gradient background wrapper (Deep Space Violet/Navy in dark mode, soft lavender in light mode).
+ * Standard app gradient background wrapper (Warm off-white in light mode, deep espresso/plum in dark mode).
  */
 @Composable
 fun AppBackground(
@@ -67,7 +68,7 @@ fun AppBackground(
 }
 
 /**
- * Glowing primary action button with horizontal gradient.
+ * Primary action button with warm Sunset Coral / Plum gradient.
  */
 @Composable
 fun GradientButton(
@@ -76,15 +77,15 @@ fun GradientButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     isLoading: Boolean = false,
-    gradient: Brush = PurpleCyanGradient,
+    gradient: Brush = if (LocalThemeIsDark.current) PlumRoseGradient else SunsetCoralGradient,
     shape: Shape = RoundedCornerShape(16.dp)
 ) {
     Box(
         modifier = modifier
             .shadow(
-                elevation = if (enabled) 10.dp else 0.dp,
+                elevation = if (enabled) 6.dp else 0.dp,
                 shape = shape,
-                spotColor = if (LocalThemeIsDark.current) NeonCyan.copy(alpha = 0.5f) else ElectricPurple.copy(alpha = 0.4f)
+                spotColor = if (LocalThemeIsDark.current) RosePlum.copy(alpha = 0.4f) else CoralPrimary.copy(alpha = 0.35f)
             )
             .clip(shape)
             .background(if (enabled) gradient else Brush.linearGradient(listOf(Color.Gray, Color.DarkGray)))
@@ -109,26 +110,60 @@ fun GradientButton(
 }
 
 /**
- * Compact Dark / Light mode toggle icon button suitable for TopAppBars.
+ * Modern animated sliding toggle button for Light and Dark mode.
  */
 @Composable
 fun DarkLightModeToggle(
     modifier: Modifier = Modifier
 ) {
     val isDark = LocalThemeIsDark.current
-    IconButton(
-        onClick = { ThemeState.toggle() },
+    val thumbOffset by animateDpAsState(
+        targetValue = if (isDark) 28.dp else 2.dp,
+        animationSpec = tween(durationMillis = 220),
+        label = "thumbOffset"
+    )
+
+    Box(
         modifier = modifier
-            .clip(CircleShape)
-            .background(if (isDark) DarkGlassCard else LightGlassCard)
-            .border(1.dp, if (isDark) DarkGlassBorderStart else LightGlassBorder, CircleShape)
+            .width(58.dp)
+            .height(30.dp)
+            .clip(RoundedCornerShape(15.dp))
+            .background(if (isDark) Color(0xFF2D222B) else Color(0xFFF2E9EE))
+            .border(
+                1.dp,
+                if (isDark) Color(0xFF453342) else Color(0xFFE2D6DF),
+                RoundedCornerShape(15.dp)
+            )
+            .clickable { ThemeState.toggle() }
+            .padding(2.dp),
+        contentAlignment = Alignment.CenterStart
     ) {
-        Icon(
-            painter = painterResource(
-                id = if (isDark) android.R.drawable.btn_star_big_on else android.R.drawable.btn_star_big_off
-            ),
-            contentDescription = "Toggle Dark/Light Mode",
-            tint = if (isDark) SunsetGold else ElectricPurple
-        )
+        // Track icons
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = "☀️", fontSize = 11.sp)
+            Text(text = "🌙", fontSize = 11.sp)
+        }
+
+        // Sliding thumb
+        Box(
+            modifier = Modifier
+                .offset(x = thumbOffset)
+                .size(24.dp)
+                .shadow(elevation = 3.dp, shape = CircleShape)
+                .clip(CircleShape)
+                .background(if (isDark) RosePlum else CoralPrimary),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = if (isDark) "🌙" else "☀️",
+                fontSize = 10.sp
+            )
+        }
     }
 }

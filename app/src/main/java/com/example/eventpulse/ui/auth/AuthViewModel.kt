@@ -158,4 +158,13 @@ class AuthViewModel(
             errorMessage = null
         )}
     }
+
+    fun updateProfile(name: String) {
+        viewModelScope.launch {
+            val email = _authUiState.value.email
+            authRepository.updateProfile(name, email)
+            _authUiState.update { it.copy(fullName = name) }
+        }
+    }
 }
+

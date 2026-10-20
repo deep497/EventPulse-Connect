@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,6 +20,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -76,7 +78,7 @@ fun LoginScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // Header with glowing pulse waveform
+            // Header with pulse waveform
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
@@ -85,7 +87,7 @@ fun LoginScreen(
                     text = "EventPulse",
                     style = MaterialTheme.typography.headlineLarge.copy(fontSize = 36.sp),
                     fontWeight = FontWeight.ExtraBold,
-                    color = if (isDark) NeonCyan else ElectricPurple
+                    color = if (isDark) CoralSoft else CoralPrimary
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 // Waveform pulse badge
@@ -93,13 +95,13 @@ fun LoginScreen(
                     modifier = Modifier
                         .size(36.dp)
                         .clip(CircleShape)
-                        .background(if (isDark) Color(0x3300F5D4) else Color(0x227B2CBF)),
+                        .background(if (isDark) Color(0x33FF6B4A) else Color(0x22E03E2D)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         painter = painterResource(id = android.R.drawable.ic_btn_speak_now),
                         contentDescription = "Pulse Waveform",
-                        tint = if (isDark) NeonCyan else ElectricPurple,
+                        tint = if (isDark) CoralSoft else CoralPrimary,
                         modifier = Modifier.size(22.dp)
                     )
                 }
@@ -114,7 +116,7 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(36.dp))
 
-            // Glassmorphic Card Container
+            // Container Card
             GlassCard(
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -154,11 +156,11 @@ fun LoginScreen(
                             Icon(
                                 painter = painterResource(id = android.R.drawable.ic_dialog_email),
                                 contentDescription = null,
-                                tint = if (isDark) NeonCyan else ElectricPurple
+                                tint = if (isDark) CoralSoft else CoralPrimary
                             )
                         },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = if (isDark) NeonCyan else ElectricPurple,
+                            focusedBorderColor = CoralPrimary,
                             unfocusedBorderColor = if (isDark) DarkGlassBorderStart else LightGlassBorder,
                             focusedContainerColor = if (isDark) DarkSearchField else LightSearchField,
                             unfocusedContainerColor = if (isDark) DarkSearchField else LightSearchField
@@ -182,7 +184,7 @@ fun LoginScreen(
                             Icon(
                                 painter = painterResource(id = android.R.drawable.ic_secure),
                                 contentDescription = null,
-                                tint = if (isDark) NeonCyan else ElectricPurple
+                                tint = if (isDark) CoralSoft else CoralPrimary
                             )
                         },
                         trailingIcon = {
@@ -198,7 +200,7 @@ fun LoginScreen(
                             }
                         },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = if (isDark) NeonCyan else ElectricPurple,
+                            focusedBorderColor = CoralPrimary,
                             unfocusedBorderColor = if (isDark) DarkGlassBorderStart else LightGlassBorder,
                             focusedContainerColor = if (isDark) DarkSearchField else LightSearchField,
                             unfocusedContainerColor = if (isDark) DarkSearchField else LightSearchField
@@ -218,7 +220,7 @@ fun LoginScreen(
                         Text(
                             text = "Forgot Password?",
                             style = MaterialTheme.typography.bodySmall,
-                            color = if (isDark) CyberBlue else ElectricPurple
+                            color = if (isDark) CoralSoft else CoralPrimary
                         )
                     }
 
@@ -234,13 +236,13 @@ fun LoginScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Glowing Purple-to-Cyan "Continue" Button
+                    // "Continue" Button with Sunset Coral Gradient
                     GradientButton(
                         text = "Continue",
                         onClick = { viewModel.login() },
                         isLoading = uiState.isLoading,
                         enabled = !uiState.isLoading,
-                        gradient = if (isDark) PurpleCyanGradient else Brush.horizontalGradient(listOf(ElectricPurple, CyberBlue)),
+                        gradient = if (isDark) PlumRoseGradient else SunsetCoralGradient,
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -252,7 +254,7 @@ fun LoginScreen(
                     ) {
                         HorizontalDivider(
                             modifier = Modifier.weight(1f),
-                            color = if (isDark) Color(0x33B3A8D6) else Color(0x336B5C8E)
+                            color = if (isDark) Color(0x33A89CA7) else Color(0x33EDE5EB)
                         )
                         Text(
                             text = "  or  ",
@@ -261,13 +263,13 @@ fun LoginScreen(
                         )
                         HorizontalDivider(
                             modifier = Modifier.weight(1f),
-                            color = if (isDark) Color(0x33B3A8D6) else Color(0x336B5C8E)
+                            color = if (isDark) Color(0x33A89CA7) else Color(0x33EDE5EB)
                         )
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Dark Translucent "Continue with Google"
+                    // "Continue with Google"
                     OutlinedButton(
                         onClick = { /* TODO: Google Sign-In */ },
                         modifier = Modifier
@@ -279,7 +281,7 @@ fun LoginScreen(
                             if (isDark) DarkGlassBorderStart else LightGlassBorder
                         ),
                         colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = if (isDark) Color(0x401C1538) else Color(0x80FFFFFF)
+                            containerColor = if (isDark) Color(0x40251B27) else Color(0x80FFFFFF)
                         ),
                         enabled = !uiState.isLoading
                     ) {
@@ -287,7 +289,7 @@ fun LoginScreen(
                             Icon(
                                 painter = painterResource(id = android.R.drawable.ic_dialog_info),
                                 contentDescription = "Google",
-                                tint = if (isDark) SunsetGold else ElectricPurple,
+                                tint = if (isDark) SunsetGold else CoralPrimary,
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
@@ -321,7 +323,7 @@ fun LoginScreen(
                     Text(
                         text = "Sign up",
                         fontWeight = FontWeight.Bold,
-                        color = if (isDark) NeonCyan else ElectricPurple
+                        color = if (isDark) CoralSoft else CoralPrimary
                     )
                 }
             }
@@ -330,7 +332,7 @@ fun LoginScreen(
 }
 
 /**
- * 3-Tab Role Selector pill bar with glowing active tab
+ * 3-Tab Role Selector pill bar with Sunset Coral & Plum styling
  */
 @Composable
 fun NeonRoleSelector(
@@ -339,7 +341,7 @@ fun NeonRoleSelector(
     modifier: Modifier = Modifier
 ) {
     val isDark = LocalThemeIsDark.current
-    val containerColor = if (isDark) Color(0x80100A24) else Color(0x66DDD6FE)
+    val containerColor = if (isDark) Color(0x80251B27) else Color(0xFFF7EFF4)
     val borderColor = if (isDark) DarkGlassBorderStart else LightGlassBorder
 
     Row(
@@ -354,12 +356,14 @@ fun NeonRoleSelector(
     ) {
         Role.values().forEach { role ->
             val isSelected = selectedRole == role
+            val tabColor = when (role) {
+                Role.USER -> CoralPrimary
+                Role.ORGANIZER -> if (isDark) RosePlum else RoyalPlum
+                Role.ADMIN -> Color(0xFF5E4962)
+            }
+
             val activeColor by animateColorAsState(
-                targetValue = if (isSelected) {
-                    if (isDark) CyberBlue else ElectricPurple
-                } else {
-                    Color.Transparent
-                },
+                targetValue = if (isSelected) tabColor else Color.Transparent,
                 label = "rolePill"
             )
 
@@ -370,8 +374,8 @@ fun NeonRoleSelector(
                     .clip(RoundedCornerShape(20.dp))
                     .background(activeColor)
                     .then(
-                        if (isSelected && isDark) {
-                            Modifier.shadow(8.dp, RoundedCornerShape(20.dp), spotColor = CyberBlue)
+                        if (isSelected) {
+                            Modifier.shadow(6.dp, RoundedCornerShape(20.dp), spotColor = tabColor)
                         } else Modifier
                     )
                     .clickable { onRoleSelected(role) },

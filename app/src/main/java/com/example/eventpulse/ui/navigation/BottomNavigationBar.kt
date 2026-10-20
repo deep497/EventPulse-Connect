@@ -27,10 +27,18 @@ fun BottomNavigationBar(
     val currentRoute = navBackStackEntry?.destination?.route
     val isDark = LocalThemeIsDark.current
 
+    // Check if this is Organizer or User navigation
+    val isOrganizerTab = items.any { it.route.startsWith("org_") }
+    val selectedAccent = if (isOrganizerTab) {
+        if (isDark) RosePlum else RoyalPlum
+    } else {
+        if (isDark) CoralSoft else CoralPrimary
+    }
+
     NavigationBar(
-        containerColor = if (isDark) DarkGlassCard else LightGlassCard,
+        containerColor = if (isDark) DarkGlassCard else Color.White,
         contentColor = if (isDark) DarkTextPrimary else LightTextPrimary,
-        tonalElevation = 8.dp,
+        tonalElevation = 6.dp,
         modifier = Modifier
             .border(
                 width = 1.dp,
@@ -52,11 +60,11 @@ fun BottomNavigationBar(
                 label = { Text(item.title) },
                 selected = isSelected,
                 colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = if (isDark) NeonCyan else ElectricPurple,
-                    selectedTextColor = if (isDark) NeonCyan else ElectricPurple,
+                    selectedIconColor = selectedAccent,
+                    selectedTextColor = selectedAccent,
                     unselectedIconColor = if (isDark) DarkTextTertiary else LightTextTertiary,
                     unselectedTextColor = if (isDark) DarkTextTertiary else LightTextTertiary,
-                    indicatorColor = if (isDark) Color(0x3300F5D4) else Color(0x337B2CBF)
+                    indicatorColor = selectedAccent.copy(alpha = 0.15f)
                 ),
                 onClick = {
                     navController.navigate(item.route) {

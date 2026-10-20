@@ -1,6 +1,8 @@
 package com.example.eventpulse.ui.auth
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -72,7 +74,7 @@ fun SignupScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // Header with glowing pulse waveform
+            // Header with waveform
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
@@ -81,20 +83,20 @@ fun SignupScreen(
                     text = "EventPulse",
                     style = MaterialTheme.typography.headlineLarge.copy(fontSize = 36.sp),
                     fontWeight = FontWeight.ExtraBold,
-                    color = if (isDark) NeonCyan else ElectricPurple
+                    color = if (isDark) CoralSoft else CoralPrimary
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Box(
                     modifier = Modifier
                         .size(36.dp)
                         .clip(CircleShape)
-                        .background(if (isDark) Color(0x3300F5D4) else Color(0x227B2CBF)),
+                        .background(if (isDark) Color(0x33FF6B4A) else Color(0x22E03E2D)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         painter = painterResource(id = android.R.drawable.ic_btn_speak_now),
                         contentDescription = "Pulse Waveform",
-                        tint = if (isDark) NeonCyan else ElectricPurple,
+                        tint = if (isDark) CoralSoft else CoralPrimary,
                         modifier = Modifier.size(22.dp)
                     )
                 }
@@ -109,7 +111,7 @@ fun SignupScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Glassmorphic Card Container
+            // Container Card
             GlassCard(
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -149,11 +151,11 @@ fun SignupScreen(
                             Icon(
                                 painter = painterResource(id = android.R.drawable.ic_menu_myplaces),
                                 contentDescription = null,
-                                tint = if (isDark) NeonCyan else ElectricPurple
+                                tint = if (isDark) CoralSoft else CoralPrimary
                             ) 
                         },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = if (isDark) NeonCyan else ElectricPurple,
+                            focusedBorderColor = CoralPrimary,
                             unfocusedBorderColor = if (isDark) DarkGlassBorderStart else LightGlassBorder,
                             focusedContainerColor = if (isDark) DarkSearchField else LightSearchField,
                             unfocusedContainerColor = if (isDark) DarkSearchField else LightSearchField
@@ -175,11 +177,11 @@ fun SignupScreen(
                             Icon(
                                 painter = painterResource(id = android.R.drawable.ic_dialog_email),
                                 contentDescription = null,
-                                tint = if (isDark) NeonCyan else ElectricPurple
+                                tint = if (isDark) CoralSoft else CoralPrimary
                             ) 
                         },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = if (isDark) NeonCyan else ElectricPurple,
+                            focusedBorderColor = CoralPrimary,
                             unfocusedBorderColor = if (isDark) DarkGlassBorderStart else LightGlassBorder,
                             focusedContainerColor = if (isDark) DarkSearchField else LightSearchField,
                             unfocusedContainerColor = if (isDark) DarkSearchField else LightSearchField
@@ -203,7 +205,7 @@ fun SignupScreen(
                             Icon(
                                 painter = painterResource(id = android.R.drawable.ic_secure),
                                 contentDescription = null,
-                                tint = if (isDark) NeonCyan else ElectricPurple
+                                tint = if (isDark) CoralSoft else CoralPrimary
                             ) 
                         },
                         trailingIcon = {
@@ -219,7 +221,7 @@ fun SignupScreen(
                             }
                         },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = if (isDark) NeonCyan else ElectricPurple,
+                            focusedBorderColor = CoralPrimary,
                             unfocusedBorderColor = if (isDark) DarkGlassBorderStart else LightGlassBorder,
                             focusedContainerColor = if (isDark) DarkSearchField else LightSearchField,
                             unfocusedContainerColor = if (isDark) DarkSearchField else LightSearchField
@@ -249,7 +251,7 @@ fun SignupScreen(
                         onClick = { viewModel.signup() },
                         isLoading = uiState.isLoading,
                         enabled = !uiState.isLoading,
-                        gradient = if (isDark) PurpleCyanGradient else Brush.horizontalGradient(listOf(ElectricPurple, CyberBlue)),
+                        gradient = if (isDark) PlumRoseGradient else SunsetCoralGradient,
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -267,7 +269,7 @@ fun SignupScreen(
                             if (isDark) DarkGlassBorderStart else LightGlassBorder
                         ),
                         colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = if (isDark) Color(0x401C1538) else Color(0x80FFFFFF)
+                            containerColor = if (isDark) Color(0x40251B27) else Color(0x80FFFFFF)
                         ),
                         enabled = !uiState.isLoading
                     ) {
@@ -275,7 +277,7 @@ fun SignupScreen(
                             Icon(
                                 painter = painterResource(id = android.R.drawable.ic_dialog_info),
                                 contentDescription = "Google",
-                                tint = if (isDark) SunsetGold else ElectricPurple,
+                                tint = if (isDark) SunsetGold else CoralPrimary,
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
@@ -289,7 +291,7 @@ fun SignupScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(28.dp))
 
             // Toggle to Login
             Row(
@@ -303,13 +305,15 @@ fun SignupScreen(
                 TextButton(
                     onClick = {
                         viewModel.clearFormFields()
-                        navController.popBackStack()
+                        navController.navigate(Screen.Login.route) {
+                            popUpTo(Screen.Signup.route) { inclusive = true }
+                        }
                     }
                 ) {
                     Text(
-                        "Login",
+                        text = "Log In",
                         fontWeight = FontWeight.Bold,
-                        color = if (isDark) NeonCyan else ElectricPurple
+                        color = if (isDark) CoralSoft else CoralPrimary
                     )
                 }
             }

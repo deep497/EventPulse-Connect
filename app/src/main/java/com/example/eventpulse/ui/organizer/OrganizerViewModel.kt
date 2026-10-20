@@ -46,9 +46,9 @@ class OrganizerViewModel(
             val result = eventRepository.getEvents()
             result.fold(
                 onSuccess = { events ->
-                    // Calculate metrics
-                    val totalSales = events.sumOf { it.availableSeats }
-                    val revenue = events.sumOf { it.price * it.availableSeats }
+                    // Calculate metrics from actual tickets sold (totalSeats - availableSeats)
+                    val totalSales = events.sumOf { (it.totalSeats - it.availableSeats).coerceAtLeast(0) }
+                    val revenue = events.sumOf { (it.totalSeats - it.availableSeats).coerceAtLeast(0) * it.price }
                     
                     _organizerUiState.update { it.copy(
                         isLoading = false,

@@ -9,59 +9,63 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.Color
 
-// Global state to toggle theme anywhere easily
+// Global state to toggle theme anywhere easily (Defaults to Light mode as requested)
 object ThemeState {
-    var isDarkMode = mutableStateOf(true) // Defaults to modern dark neon
+    var isDarkMode = mutableStateOf(false)
 
     fun toggle() {
         isDarkMode.value = !isDarkMode.value
     }
+
+    fun setDarkMode(isDark: Boolean) {
+        isDarkMode.value = isDark
+    }
 }
 
-val LocalThemeIsDark = compositionLocalOf { true }
+val LocalThemeIsDark = compositionLocalOf { false }
 
 private val DarkColorScheme = darkColorScheme(
-    primary = NeonCyan,
-    onPrimary = Color(0xFF090514),
-    primaryContainer = ElectricPurple,
-    onPrimaryContainer = Color.White,
-    secondary = CyberBlue,
-    onSecondary = Color.White,
-    secondaryContainer = Color(0xFF261C4C),
-    onSecondaryContainer = Color(0xFFD6CEF5),
-    tertiary = SunsetOrange,
-    onTertiary = Color.White,
+    primary = CoralSoft,
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFF382320),
+    onPrimaryContainer = Color(0xFFFFDBCF),
+    secondary = RosePlum,
+    onSecondary = Color(0xFF1F121C),
+    secondaryContainer = Color(0xFF3B2538),
+    onSecondaryContainer = Color(0xFFF6D6F2),
+    tertiary = AmberBright,
+    onTertiary = Color.Black,
     background = DarkBackgroundStart,
     onBackground = DarkTextPrimary,
     surface = DarkGlassCard,
     onSurface = DarkTextPrimary,
-    surfaceVariant = Color(0xFF261C4C),
+    surfaceVariant = Color(0xFF2C222B),
     onSurfaceVariant = DarkTextSecondary,
     outline = DarkGlassBorderStart,
-    outlineVariant = Color(0x333E2F75),
+    outlineVariant = Color(0x33423042),
     error = StatusRejected,
     onError = Color.White
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = ElectricPurple,
+    primary = CoralPrimary,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFDDD6FE),
-    onPrimaryContainer = Color(0xFF1E1338),
-    secondary = CyberBlue,
+    primaryContainer = Color(0xFFFFECE5),
+    onPrimaryContainer = Color(0xFF4A1006),
+    secondary = RoyalPlum,
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFE0E7FF),
-    onSecondaryContainer = Color(0xFF1E1B4B),
-    tertiary = SunsetOrange,
+    secondaryContainer = Color(0xFFF7EEF8),
+    onSecondaryContainer = Color(0xFF320736),
+    tertiary = AmberGold,
     onTertiary = Color.White,
     background = LightBackgroundStart,
     onBackground = LightTextPrimary,
     surface = LightGlassCard,
     onSurface = LightTextPrimary,
-    surfaceVariant = Color(0xFFEDE9FE),
+    surfaceVariant = Color(0xFFF5EEF1),
     onSurfaceVariant = LightTextSecondary,
     outline = LightGlassBorder,
-    outlineVariant = Color(0x33DDD6FE),
+    outlineVariant = Color(0x33EDE5EB),
     error = StatusRejected,
     onError = Color.White
 )

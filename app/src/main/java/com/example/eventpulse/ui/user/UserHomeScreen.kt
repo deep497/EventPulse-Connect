@@ -45,28 +45,28 @@ fun UserHomeScreen(
     val chatVm = chatViewModel()
     val isDark = LocalThemeIsDark.current
 
-    val userName = authState.fullName.ifBlank { "Alex" }.split(" ").first()
+    val userName = authState.fullName.ifBlank { authState.user?.name ?: "Alex" }.split(" ").first()
+    val userInitial = userName.take(1).uppercase()
 
     Scaffold(
         containerColor = Color.Transparent,
         floatingActionButton = {
-            // Glowing Circular AI Chatbot FAB (Exact match to Reference Picture 1)
+            // Circular Coral FAB with sparkle (Exact match to Sunset Coral User column)
             Box(
                 modifier = Modifier
                     .padding(bottom = 12.dp)
-                    .size(62.dp)
-                    .shadow(16.dp, CircleShape, spotColor = NeonCyan)
+                    .size(58.dp)
+                    .shadow(12.dp, CircleShape, spotColor = if (isDark) AmberGold else CoralPrimary)
                     .clip(CircleShape)
-                    .background(AiButtonGradient)
-                    .border(2.dp, Color.White.copy(alpha = 0.6f), CircleShape)
+                    .background(if (isDark) Brush.verticalGradient(listOf(AmberGold, CoralPrimary)) else Brush.verticalGradient(listOf(CoralPrimary, CoralAccent)))
                     .clickable { showAiChat = true },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    painter = painterResource(id = android.R.drawable.ic_dialog_info),
-                    contentDescription = "AI Assistant",
-                    tint = Color.White,
-                    modifier = Modifier.size(32.dp)
+                Text(
+                    text = "✦",
+                    fontSize = 26.sp,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
                 )
             }
         }
@@ -82,7 +82,7 @@ fun UserHomeScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(if (isDark) DarkBackgroundGradient else LightBackgroundGradient)
+                .background(if (isDark) UserDarkBackgroundStart else UserLightBackgroundStart)
         ) {
             LazyColumn(
                 modifier = Modifier
@@ -91,7 +91,7 @@ fun UserHomeScreen(
                 contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Top Location Bar + Dark/Light Toggle + Avatar
+                // Top Header Row: Hello, Alex (left) + Location Pill, Toggle & Coral Avatar (right)
                 item {
                     Row(
                         modifier = Modifier
@@ -100,69 +100,66 @@ fun UserHomeScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        // Location Picker
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(if (isDark) Color(0x401C1538) else Color(0x66DDD6FE))
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            Icon(
-                                painter = painterResource(id = android.R.drawable.ic_menu_mylocation),
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                                tint = if (isDark) NeonCyan else ElectricPurple
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
+                        // Left: Greeting
+                        Column {
                             Text(
-                                text = uiState.locationText.ifBlank { "San Francisco, CA" },
+                                text = "Hello,",
                                 style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = if (isDark) DarkTextPrimary else LightTextPrimary
+                                color = if (isDark) UserDarkTextSecondary else UserLightTextSecondary
+                            )
+                            Text(
+                                text = userName,
+                                style = MaterialTheme.typography.headlineMedium.copy(fontSize = 24.sp),
+                                fontWeight = FontWeight.ExtraBold,
+                                color = if (isDark) UserDarkTextPrimary else UserLightTextPrimary
                             )
                         }
 
-                        // Right actions: Theme Switcher & Profile Avatar
+                        // Right: Location pill, Theme Switcher & Coral Avatar
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             DarkLightModeToggle()
 
-                            // Profile Avatar with neon ring
+                            // Location Pill [Mumbai]
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(if (isDark) UserDarkCard else Color.White)
+                                    .border(1.dp, if (isDark) UserDarkBorder else UserLightBorder, RoundedCornerShape(20.dp))
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Text(
+                                    text = uiState.locationText.ifBlank { "Mumbai" },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (isDark) UserDarkTextPrimary else UserLightTextPrimary
+                                )
+                            }
+
+                            // User Avatar in Solid Coral
                             Box(
                                 modifier = Modifier
-                                    .size(40.dp)
+                                    .size(38.dp)
                                     .clip(CircleShape)
-                                    .background(if (isDark) Color(0xFF261C4C) else Color(0xFFDDD6FE))
-                                    .border(1.5.dp, if (isDark) NeonCyan else ElectricPurple, CircleShape),
+                                    .background(if (isDark) CoralAccent else CoralPrimary)
+                                    .clickable { navController.navigate(Screen.UserProfile.route) },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = userName.take(1).uppercase(),
+                                    text = userInitial,
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 18.sp,
-                                    color = if (isDark) NeonCyan else ElectricPurple
+                                    fontSize = 17.sp,
+                                    color = Color.White
                                 )
                             }
                         }
                     }
                 }
 
-                // Greeting Header: "Hello, Alex!"
-                item {
-                    Column(modifier = Modifier.padding(top = 4.dp)) {
-                        Text(
-                            text = "Hello, $userName!",
-                            style = MaterialTheme.typography.headlineLarge,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = if (isDark) DarkTextPrimary else LightTextPrimary
-                        )
-                    }
-                }
-
-                // Modern Search Bar
+                // Search Bar
                 item {
                     OutlinedTextField(
                         value = uiState.searchQuery,
@@ -170,42 +167,38 @@ fun UserHomeScreen(
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = {
                             Text(
-                                "Search events, artists, venues...",
-                                color = if (isDark) DarkTextTertiary else LightTextTertiary
+                                "Search events, artists, venues",
+                                color = if (isDark) UserDarkTextTertiary else UserLightTextTertiary,
+                                fontSize = 14.sp
                             )
                         },
                         leadingIcon = {
                             Icon(
                                 painter = painterResource(id = android.R.drawable.ic_menu_search),
                                 contentDescription = null,
-                                tint = if (isDark) NeonCyan else ElectricPurple
+                                tint = if (isDark) UserDarkTextSecondary else UserLightTextSecondary,
+                                modifier = Modifier.size(20.dp)
                             )
                         },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = if (isDark) NeonCyan else ElectricPurple,
-                            unfocusedBorderColor = if (isDark) DarkGlassBorderStart else LightGlassBorder,
-                            focusedContainerColor = if (isDark) DarkSearchField else LightSearchField,
-                            unfocusedContainerColor = if (isDark) DarkSearchField else LightSearchField
+                            focusedBorderColor = CoralPrimary,
+                            unfocusedBorderColor = if (isDark) UserDarkBorder else UserLightBorder,
+                            focusedContainerColor = if (isDark) UserDarkSearchField else UserLightSearchField,
+                            unfocusedContainerColor = if (isDark) UserDarkSearchField else UserLightSearchField
                         ),
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(24.dp),
                         singleLine = true
                     )
                 }
 
-                // Category Filter Chips with Icons
+                // Category Filter Chips: All (active in Coral), Music, Tech, Art, Sports
                 item {
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        val categoriesWithIcons = listOf(
-                            Pair("All", android.R.drawable.ic_menu_view),
-                            Pair("Music", android.R.drawable.ic_media_play),
-                            Pair("Tech", android.R.drawable.ic_menu_info_details),
-                            Pair("Art", android.R.drawable.ic_menu_gallery),
-                            Pair("Sports", android.R.drawable.ic_menu_compass)
-                        )
+                        val categories = listOf("All", "Music", "Tech", "Art", "Sports")
 
-                        items(categoriesWithIcons) { (categoryName, iconRes) ->
+                        items(categories) { categoryName ->
                             val isSelected = uiState.selectedCategory.equals(categoryName, ignoreCase = true) ||
                                     (categoryName == "All" && uiState.selectedCategory.isEmpty())
 
@@ -213,61 +206,49 @@ fun UserHomeScreen(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(20.dp))
                                     .background(
-                                        if (isSelected) {
-                                            if (isDark) ElectricPurple else ElectricPurple
-                                        } else {
-                                            if (isDark) Color(0x401C1538) else Color(0x66DDD6FE)
-                                        }
+                                        if (isSelected) CoralPrimary
+                                        else if (isDark) UserDarkCard else Color.White
                                     )
                                     .border(
                                         1.dp,
-                                        if (isSelected) NeonCyan else if (isDark) DarkGlassBorderStart else LightGlassBorder,
+                                        if (isSelected) CoralPrimary else if (isDark) UserDarkBorder else UserLightBorder,
                                         RoundedCornerShape(20.dp)
                                     )
                                     .clickable { viewModel.updateSelectedCategory(categoryName) }
-                                    .padding(horizontal = 16.dp, vertical = 9.dp),
+                                    .padding(horizontal = 18.dp, vertical = 9.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        painter = painterResource(id = iconRes),
-                                        contentDescription = null,
-                                        tint = if (isSelected) Color.White else if (isDark) DarkTextSecondary else LightTextSecondary,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = categoryName,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (isSelected) Color.White else if (isDark) DarkTextSecondary else LightTextSecondary
-                                    )
-                                }
+                                Text(
+                                    text = categoryName,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) Color.White else (if (isDark) UserDarkTextSecondary else UserLightTextSecondary)
+                                )
                             }
                         }
                     }
                 }
 
-                // Section Header: "Recommended for You" + "See all"
+                // Section Header: "Recommended for you" + "See all"
                 item {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 8.dp),
+                            .padding(top = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Recommended for You",
+                            text = "Recommended for you",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
-                            color = if (isDark) DarkTextPrimary else LightTextPrimary
+                            color = if (isDark) UserDarkTextPrimary else UserLightTextPrimary
                         )
                         Text(
                             text = "See all",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold,
-                            color = if (isDark) CyberBlue else ElectricPurple
+                            color = if (isDark) CoralSoft else CoralPrimary
                         )
                     }
                 }
@@ -281,7 +262,7 @@ fun UserHomeScreen(
                                 .height(120.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            CircularProgressIndicator(color = if (isDark) NeonCyan else ElectricPurple)
+                            CircularProgressIndicator(color = CoralPrimary)
                         }
                     }
                 }
@@ -300,7 +281,7 @@ fun UserHomeScreen(
                     }
                 }
 
-                // Event Cards List
+                // Recommended Events List
                 items(uiState.recommendedEvents) { event ->
                     NeonEventCard(
                         event = event,
@@ -324,17 +305,21 @@ fun UserHomeScreen(
                                     text = "No Events Found",
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (isDark) DarkTextPrimary else LightTextPrimary
+                                    color = if (isDark) UserDarkTextPrimary else UserLightTextPrimary
                                 )
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Text(
                                     text = "Check back later or ask the AI Assistant for recommendations!",
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = if (isDark) DarkTextSecondary else LightTextSecondary
+                                    color = if (isDark) UserDarkTextSecondary else UserLightTextSecondary
                                 )
                             }
                         }
                     }
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(60.dp))
                 }
             }
         }
@@ -342,7 +327,7 @@ fun UserHomeScreen(
 }
 
 /**
- * Rich Event Card matching Photo 1 & Photo 4
+ * Rich Event Card matching Sunset Coral Reference Picture
  */
 @Composable
 fun NeonEventCard(
@@ -352,12 +337,8 @@ fun NeonEventCard(
 ) {
     val isDark = LocalThemeIsDark.current
 
-    // Generate dynamic banner gradient based on event category / title
-    val bannerGradient = when (event.category.lowercase()) {
-        "music" -> SunsetCardGradient
-        "tech" -> TechCardGradient
-        else -> Brush.verticalGradient(listOf(ElectricPurple, CyberBlue))
-    }
+    // Warm Sunset Coral banner gradient
+    val bannerGradient = if (isDark) SunsetDarkHeroGradient else SunsetHeroGradient
 
     GlassCard(
         modifier = modifier
@@ -373,28 +354,20 @@ fun NeonEventCard(
                     .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
                     .background(bannerGradient)
             ) {
-                // Subtle overlay pattern
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color(0x20000000))
-                )
-
-                // Overlaid Price Pill on bottom-right (Free or ₹499)
+                // Dark pill on bottom-right with price: e.g. ₹499+ or Free
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(12.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(if (event.price <= 0) Color(0xCC10B981) else Color(0xCC3A86FF))
-                        .border(1.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
-                        .padding(horizontal = 12.dp, vertical = 4.dp)
+                        .background(Color(0xE614110F))
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        text = if (event.price > 0) "₹${event.price.toInt()}" else "Free",
+                        text = if (event.price > 0) "₹${event.price.toInt()}+" else "Free",
                         color = Color.White,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.ExtraBold
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold
                     )
                 }
 
@@ -404,12 +377,12 @@ fun NeonEventCard(
                         .align(Alignment.TopStart)
                         .padding(12.dp)
                         .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0x99090514))
+                        .background(Color(0x99000000))
                         .padding(horizontal = 10.dp, vertical = 3.dp)
                 ) {
                     Text(
                         text = event.category.ifBlank { "Event" },
-                        color = NeonCyan,
+                        color = Color.White,
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold
                     )
@@ -422,7 +395,7 @@ fun NeonEventCard(
                     text = event.title,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = if (isDark) DarkTextPrimary else LightTextPrimary
+                    color = if (isDark) UserDarkTextPrimary else UserLightTextPrimary
                 )
 
                 Spacer(modifier = Modifier.height(6.dp))
@@ -435,13 +408,13 @@ fun NeonEventCard(
                         painter = painterResource(id = android.R.drawable.ic_menu_today),
                         contentDescription = null,
                         modifier = Modifier.size(15.dp),
-                        tint = if (isDark) DarkTextSecondary else LightTextSecondary
+                        tint = if (isDark) UserDarkTextSecondary else UserLightTextSecondary
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = event.date.ifBlank { "Upcoming Date" },
                         style = MaterialTheme.typography.bodyMedium,
-                        color = if (isDark) DarkTextSecondary else LightTextSecondary
+                        color = if (isDark) UserDarkTextSecondary else UserLightTextSecondary
                     )
 
                     Spacer(modifier = Modifier.width(12.dp))
@@ -450,13 +423,13 @@ fun NeonEventCard(
                         painter = painterResource(id = android.R.drawable.ic_menu_mylocation),
                         contentDescription = null,
                         modifier = Modifier.size(15.dp),
-                        tint = if (isDark) DarkTextSecondary else LightTextSecondary
+                        tint = if (isDark) UserDarkTextSecondary else UserLightTextSecondary
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = event.location.ifBlank { "Venue" },
+                        text = event.location.ifBlank { "Skyline Arena" },
                         style = MaterialTheme.typography.bodyMedium,
-                        color = if (isDark) DarkTextSecondary else LightTextSecondary
+                        color = if (isDark) UserDarkTextSecondary else UserLightTextSecondary
                     )
                 }
 
@@ -465,7 +438,7 @@ fun NeonEventCard(
                     Text(
                         text = "🔥 ${event.availableSeats} seats left",
                         style = MaterialTheme.typography.labelSmall,
-                        color = if (isDark) NeonCyan else ElectricPurple,
+                        color = CoralPrimary,
                         fontWeight = FontWeight.SemiBold
                     )
                 }

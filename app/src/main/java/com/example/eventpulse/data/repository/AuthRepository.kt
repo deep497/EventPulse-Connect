@@ -74,6 +74,10 @@ class AuthRepository(
 
     suspend fun logout() = sessionManager.clearSession()
 
+    suspend fun updateProfile(name: String, email: String) {
+        sessionManager.saveUserDetails(name, email)
+    }
+
     fun getJwtToken(): Flow<String?> = sessionManager.getJwtToken()
     fun getUserRole(): Flow<Role?> = sessionManager.getUserRole()
     fun getUserId(): Flow<String?> = sessionManager.getUserId()
