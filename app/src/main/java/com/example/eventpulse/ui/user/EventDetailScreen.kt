@@ -1,15 +1,27 @@
 package com.example.eventpulse.ui.user
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
-import androidx.compose.ui.res.painterResource
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.navigation.NavHostController
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavHostController
+import coil.compose.AsyncImage
+import com.example.eventpulse.ui.components.GlassCard
+import com.example.eventpulse.ui.navigation.Screen
+import com.example.eventpulse.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -20,7 +32,8 @@ fun EventDetailScreen(
 ) {
     val uiState by viewModel.userUiState.collectAsStateWithLifecycle()
     var ticketQuantity by remember { mutableIntStateOf(1) }
-    
+    val isDark = LocalThemeIsDark.current
+
     LaunchedEffect(eventId) {
         viewModel.loadEventById(eventId)
     }
@@ -28,246 +41,308 @@ fun EventDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Event Details") },
+                title = { Text("Event Details", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(
-                            painter = painterResource(id = android.R.drawable.ic_menu_revert),
-                            contentDescription = "Back"
+                        Text(
+                            text = "←",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDark) UserDarkTextPrimary else UserLightTextPrimary
                         )
                     }
                 }
             )
         }
     ) { paddingValues ->
-        if (uiState.isLoading) {
+        if (uiState.isLoading && uiState.selectedEvent == null) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator()
+                CircularProgressIndicator(color = CoralPrimary)
             }
         } else if (uiState.selectedEvent != null) {
             val event = uiState.selectedEvent!!
             val totalPrice = event.price * ticketQuantity
-            
+            val bannerGradient = if (isDark) SunsetDarkHeroGradient else SunsetHeroGradient
+
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
             ) {
-                // Scrollable content
+                // Scrollable content area
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .padding(16.dp)
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Event Banner Placeholder
-                    Card(
+                    // Event Banner
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(200.dp)
+                            .height(210.dp)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(bannerGradient)
                     ) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
+                        if (event.imageUrl.isNotBlank()) {
+                            AsyncImage(
+                                model = event.imageUrl,
+                                contentDescription = event.title,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("🎟️", fontSize = 54.sp)
+                            }
+                        }
+
+                        // Category pill overlaid on banner
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color(0xCC000000),
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .padding(12.dp)
                         ) {
-                            Text("Event Banner")
+                            Text(
+                                text = event.category.ifBlank { "Event" },
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Event Title & Category
+                    // Title & Pricing Row
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.Top
                     ) {
-                        Text(
-                            text = event.title,
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.weight(1f)
-                        )
-                        
-                        AssistChip(
-                            onClick = { },
-                            label = { Text(event.category) }
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Date & Time
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            painter = painterResource(id = android.R.drawable.ic_menu_mylocation),
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = event.date,
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Medium
+                                text = event.title,
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = if (isDark) UserDarkTextPrimary else UserLightTextPrimary
                             )
-                            Text(
-                                text = event.location,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            if (event.availableSeats > 0) {
+                                Text(
+                                    text = "🔥 ${event.availableSeats} seats available",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = CoralPrimary,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                )
+                            }
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Divider()
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Description
-                    Text(
-                        text = "About Event",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = event.description,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Ticket Info
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = CoralPrimary.copy(alpha = 0.15f),
+                            modifier = Modifier.padding(start = 8.dp)
+                        ) {
                             Text(
-                                text = "Price per ticket",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = "$${event.price}",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(
-                                text = "Available",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = "${event.availableSeats} seats",
+                                text = if (event.price > 0) "₹${event.price.toInt()}" else "Free",
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                color = CoralPrimary,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                             )
                         }
                     }
+
+                    HorizontalDivider()
+
+                    // Date & Location Info
+                    GlassCard(modifier = Modifier.fillMaxWidth()) {
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("📅", fontSize = 18.sp)
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        text = "Date & Time",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (isDark) UserDarkTextSecondary else UserLightTextSecondary
+                                    )
+                                    Text(
+                                        text = event.date.ifBlank { "Date TBA" },
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+
+                            HorizontalDivider(color = Color(0x22888888))
+
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("📍", fontSize = 18.sp)
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        text = "Location / Venue",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (isDark) UserDarkTextSecondary else UserLightTextSecondary
+                                    )
+                                    Text(
+                                        text = event.location.ifBlank { "Venue TBA" },
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // About Event Description
+                    Text(
+                        text = "About This Event",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDark) UserDarkTextPrimary else UserLightTextPrimary
+                    )
+                    Text(
+                        text = event.description.ifBlank { "No description provided." },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (isDark) UserDarkTextSecondary else UserLightTextSecondary,
+                        lineHeight = 22.sp
+                    )
                 }
 
-                // Bottom Booking Section
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.large
+                // Bottom Ticket Booking Card
+                Surface(
+                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                    color = if (isDark) Color(0xFF1F1722) else Color(0xFFFFF9F8),
+                    tonalElevation = 8.dp,
+                    shadowElevation = 8.dp,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        // Quantity Selector
+                        // Ticket Quantity Stepper
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "Tickets",
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                            
+                            Column {
+                                Text(
+                                    text = "Select Tickets",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Max ${event.availableSeats.coerceAtMost(10)} per order",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (isDark) UserDarkTextSecondary else UserLightTextSecondary
+                                )
+                            }
+
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 FilledIconButton(
                                     onClick = { if (ticketQuantity > 1) ticketQuantity-- },
-                                    enabled = ticketQuantity > 1
+                                    enabled = ticketQuantity > 1,
+                                    colors = IconButtonDefaults.filledIconButtonColors(
+                                        containerColor = if (isDark) Color(0xFF382736) else Color(0xFFFFECE7)
+                                    )
                                 ) {
-                                    Icon(
-                                        painter = painterResource(id = android.R.drawable.btn_minus),
-                                        contentDescription = "Decrease"
+                                    Text(
+                                        text = "−",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (ticketQuantity > 1) CoralPrimary else Color.Gray
                                     )
                                 }
-                                
+
                                 Text(
                                     text = ticketQuantity.toString(),
                                     style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.widthIn(min = 32.dp)
+                                    fontWeight = FontWeight.ExtraBold,
+                                    modifier = Modifier.widthIn(min = 28.dp)
                                 )
-                                
+
                                 FilledIconButton(
-                                    onClick = { if (ticketQuantity < event.availableSeats) ticketQuantity++ },
-                                    enabled = ticketQuantity < event.availableSeats
+                                    onClick = {
+                                        if (ticketQuantity < event.availableSeats && ticketQuantity < 10) {
+                                            ticketQuantity++
+                                        }
+                                    },
+                                    enabled = ticketQuantity < event.availableSeats && ticketQuantity < 10,
+                                    colors = IconButtonDefaults.filledIconButtonColors(
+                                        containerColor = if (isDark) Color(0xFF382736) else Color(0xFFFFECE7)
+                                    )
                                 ) {
-                                    Icon(
-                                        painter = painterResource(id = android.R.drawable.ic_input_add),
-                                        contentDescription = "Increase"
+                                    Text(
+                                        text = "+",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (ticketQuantity < event.availableSeats) CoralPrimary else Color.Gray
                                     )
                                 }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                        HorizontalDivider(color = Color(0x22888888))
 
-                        Divider()
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        // Total Price
+                        // Total Price & Checkout Button Row
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "Total",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "$${"%.2f".format(totalPrice)}",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
+                            Column {
+                                Text(
+                                    text = "Total Price",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (isDark) UserDarkTextSecondary else UserLightTextSecondary
+                                )
+                                Text(
+                                    text = if (totalPrice > 0) "₹${totalPrice.toInt()}" else "Free",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = CoralPrimary
+                                )
+                            }
 
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // Book Now Button
-                        Button(
-                            onClick = {
-                                viewModel.createBooking(eventId, ticketQuantity)
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = event.availableSeats > 0
-                        ) {
-                            Text("Book Now")
+                            Button(
+                                onClick = {
+                                    navController.navigate(Screen.Checkout.createRoute(eventId, ticketQuantity))
+                                },
+                                enabled = event.availableSeats > 0,
+                                colors = ButtonDefaults.buttonColors(containerColor = CoralPrimary),
+                                shape = RoundedCornerShape(14.dp),
+                                modifier = Modifier
+                                    .height(48.dp)
+                                    .padding(start = 16.dp)
+                            ) {
+                                Text(
+                                    text = if (event.price == 0.0) "Register Free" else "Proceed to Checkout",
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
                         }
                     }
                 }
@@ -279,7 +354,7 @@ fun EventDetailScreen(
                     .padding(paddingValues),
                 contentAlignment = Alignment.Center
             ) {
-                Text("Event not found")
+                Text("Event not found or unavailable.")
             }
         }
     }

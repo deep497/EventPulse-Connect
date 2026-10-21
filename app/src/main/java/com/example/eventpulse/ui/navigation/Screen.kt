@@ -15,6 +15,10 @@ sealed class Screen(val route: String) {
     object EventDetail : Screen("event_detail/{eventId}") {
         fun createRoute(eventId: String) = "event_detail/$eventId"
     }
+
+    object Checkout : Screen("checkout/{eventId}?quantity={quantity}") {
+        fun createRoute(eventId: String, quantity: Int = 1) = "checkout/$eventId?quantity=$quantity"
+    }
     
     // Organizer bottom nav screens
     object OrgDashboard : Screen("org_dashboard")

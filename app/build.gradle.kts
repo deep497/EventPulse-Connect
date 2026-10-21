@@ -81,8 +81,8 @@ dependencies {
     // Coil
     implementation(libs.coil.compose)
     
-    // Razorpay
-    implementation(libs.razorpay.checkout)
+    // Google Pay Wallet SDK (ENVIRONMENT_TEST)
+    implementation("com.google.android.gms:play-services-wallet:19.4.0")
     
     // ML Kit & CameraX
     implementation(libs.google.mlkit.barcode.scanning)

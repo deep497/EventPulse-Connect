@@ -285,6 +285,8 @@ fun UserHomeScreen(
                 items(uiState.recommendedEvents) { event ->
                     NeonEventCard(
                         event = event,
+                        isFavorite = uiState.favoriteEventIds.contains(event.id),
+                        onToggleFavorite = { viewModel.toggleFavorite(event.id) },
                         onClick = {
                             navController.navigate(Screen.EventDetail.createRoute(event.id))
                         }
@@ -333,7 +335,9 @@ fun UserHomeScreen(
 fun NeonEventCard(
     event: Event,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isFavorite: Boolean = false,
+    onToggleFavorite: () -> Unit = {}
 ) {
     val isDark = LocalThemeIsDark.current
 
@@ -354,6 +358,23 @@ fun NeonEventCard(
                     .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
                     .background(bannerGradient)
             ) {
+                // Heart Favorite button on top-right
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(10.dp)
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(Color(0x99000000))
+                        .clickable(onClick = onToggleFavorite),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (isFavorite) "❤️" else "🤍",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+
                 // Dark pill on bottom-right with price: e.g. ₹499+ or Free
                 Box(
                     modifier = Modifier

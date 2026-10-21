@@ -136,8 +136,9 @@ fun SignupScreen(
                     )
 
                     NeonRoleSelector(
-                        selectedRole = uiState.selectedRole,
-                        onRoleSelected = { viewModel.updateSelectedRole(it) }
+                        selectedRole = if (uiState.selectedRole == Role.ADMIN) Role.USER else uiState.selectedRole,
+                        onRoleSelected = { viewModel.updateSelectedRole(it) },
+                        roles = listOf(Role.USER, Role.ORGANIZER)
                     )
 
                     Spacer(modifier = Modifier.height(20.dp))

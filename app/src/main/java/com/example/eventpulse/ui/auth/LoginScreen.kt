@@ -338,7 +338,8 @@ fun LoginScreen(
 fun NeonRoleSelector(
     selectedRole: Role,
     onRoleSelected: (Role) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    roles: List<Role> = Role.values().toList()
 ) {
     val isDark = LocalThemeIsDark.current
     val containerColor = if (isDark) Color(0x80251B27) else Color(0xFFF7EFF4)
@@ -354,7 +355,7 @@ fun NeonRoleSelector(
             .padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Role.values().forEach { role ->
+        roles.forEach { role ->
             val isSelected = selectedRole == role
             val tabColor = when (role) {
                 Role.USER -> CoralPrimary

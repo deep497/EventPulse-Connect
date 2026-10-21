@@ -7,5 +7,7 @@ data class User(
     val name: String = "",
     val email: String = "",
     val role: Role = Role.USER,
+    val phoneNumber: String = "",
+    val isBlocked: Boolean = false,
     val createdAt: String = ""
 )

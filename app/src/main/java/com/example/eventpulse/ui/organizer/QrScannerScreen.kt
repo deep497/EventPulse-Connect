@@ -1,12 +1,16 @@
 package com.example.eventpulse.ui.organizer
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
-import androidx.compose.ui.res.painterResource
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 
@@ -16,14 +20,35 @@ fun QrScannerScreen(
     navController: NavHostController,
     viewModel: OrganizerViewModel
 ) {
-    var showVerifiedDialog by remember { mutableStateOf(false) }
-    var showAlreadyUsedDialog by remember { mutableStateOf(false) }
-    var scannedTicketInfo by remember { mutableStateOf("") }
+    var manualInput by remember { mutableStateOf("") }
+    var isVerifying by remember { mutableStateOf(false) }
+
+    var resultMessage by remember { mutableStateOf<String?>(null) }
+    var isSuccessResult by remember { mutableStateOf(false) }
+    var showResultDialog by remember { mutableStateOf(false) }
+
+    val handleCheckIn: (String) -> Unit = { code ->
+        val trimmed = code.trim()
+        if (trimmed.isNotEmpty()) {
+            isVerifying = true
+            // If length is 64 hex characters, treat as qrCodeHash; otherwise bookingId
+            val isHash = trimmed.length == 64 && trimmed.all { it in "0123456789abcdefABCDEF" }
+            val qrCodeHash = if (isHash) trimmed else null
+            val bookingId = if (!isHash) trimmed else null
+
+            viewModel.checkIn(qrCodeHash = qrCodeHash, bookingId = bookingId) { success, msg ->
+                isVerifying = false
+                isSuccessResult = success
+                resultMessage = msg
+                showResultDialog = true
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Scan QR Ticket") },
+                title = { Text("Ticket Check-In") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(
@@ -35,189 +60,188 @@ fun QrScannerScreen(
             )
         }
     ) { paddingValues ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Column(
+            Text(
+                text = "Attendee Ticket Verification",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+
+            // Camera preview placeholder
+            Card(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .fillMaxWidth()
+                    .height(220.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
             ) {
-                Text(
-                    text = "Position QR code within the frame",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Camera preview placeholder
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1f),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                ) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                "Camera preview will appear here",
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                "CameraX + ML Kit Integration",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = "Hold your device steady for automatic scanning",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Test buttons (for demonstration)
-                Card(
-                    modifier = Modifier.fillMaxWidth()
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
                 ) {
                     Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.padding(16.dp)
                     ) {
                         Text(
-                            "Test Scanner (Development)",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = "📷",
+                            style = MaterialTheme.typography.displayMedium
                         )
                         Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            OutlinedButton(
-                                onClick = {
-                                    scannedTicketInfo = "Booking #12345"
-                                    showVerifiedDialog = true
-                                },
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text("Simulate Valid")
-                            }
-                            OutlinedButton(
-                                onClick = {
-                                    scannedTicketInfo = "Booking #67890"
-                                    showAlreadyUsedDialog = true
-                                },
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text("Simulate Used")
-                            }
+                        Text(
+                            text = "Camera Scanner Preview",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Point camera at attendee's QR pass",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+
+            // Manual Entry Section
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Manual Check-In by ID",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "If camera scanning fails, enter the 24-character Booking ID or QR hash directly:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    OutlinedTextField(
+                        value = manualInput,
+                        onValueChange = { manualInput = it },
+                        label = { Text("Booking ID / QR Hash") },
+                        placeholder = { Text("e.g. 660f... or hash") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
+                    Button(
+                        onClick = { handleCheckIn(manualInput) },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = manualInput.isNotBlank() && !isVerifying,
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        if (isVerifying) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Verifying...")
+                        } else {
+                            Text("Verify & Check In")
                         }
+                    }
+                }
+            }
+
+            // Development Quick Simulation
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "Quick Test Shortcuts",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "Paste a booking ID from MongoDB or click to simulate an invalid check-in test:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    OutlinedButton(
+                        onClick = { handleCheckIn("000000000000000000000000") },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isVerifying
+                    ) {
+                        Text("Test Non-Existent Booking ID")
                     }
                 }
             }
         }
 
-        // Verified Dialog
-        if (showVerifiedDialog) {
+        // Result Dialog (Success or Error)
+        if (showResultDialog) {
             AlertDialog(
-                onDismissRequest = { showVerifiedDialog = false },
+                onDismissRequest = { showResultDialog = false },
                 icon = {
-                    Icon(
-                        //Icons.Default.CheckCircle,
-                        painter = painterResource(id = android.R.drawable.ic_menu_edit),
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(48.dp)
+                    Text(
+                        text = if (isSuccessResult) "✅" else "❌",
+                        style = MaterialTheme.typography.displaySmall
                     )
                 },
                 title = {
                     Text(
-                        "Ticket Verified!",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                text = {
-                    Column {
-                        Text(
-                            scannedTicketInfo,
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            "Entry approved. Welcome!",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = { showVerifiedDialog = false }
-                    ) {
-                        Text("Done")
-                    }
-                }
-            )
-        }
-
-        // Already Used Dialog
-        if (showAlreadyUsedDialog) {
-            AlertDialog(
-                onDismissRequest = { showAlreadyUsedDialog = false },
-                icon = {
-                    Icon(
-                        //Icons.Default.Close,
-                        painter = painterResource(id = android.R.drawable.ic_menu_edit),
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(48.dp)
-                    )
-                },
-                title = {
-                    Text(
-                        "Already Used",
+                        text = if (isSuccessResult) "Check-In Approved!" else "Check-In Failed",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.error
+                        color = if (isSuccessResult) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
                     )
                 },
                 text = {
-                    Column {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
-                            scannedTicketInfo,
-                            style = MaterialTheme.typography.bodyLarge
+                            text = resultMessage ?: if (isSuccessResult) "Attendee entry approved." else "Unable to verify ticket.",
+                            style = MaterialTheme.typography.bodyMedium
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            "This ticket has already been scanned and used for entry.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        if (isSuccessResult) {
+                            Text(
+                                text = "Ticket marked as USED. The attendee is admitted.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 },
                 confirmButton = {
-                    TextButton(
-                        onClick = { showAlreadyUsedDialog = false }
-                    ) {
+                    Button(onClick = {
+                        showResultDialog = false
+                        if (isSuccessResult) {
+                            manualInput = ""
+                        }
+                    }) {
                         Text("OK")
                     }
                 }

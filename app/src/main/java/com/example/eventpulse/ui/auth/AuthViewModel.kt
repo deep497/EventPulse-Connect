@@ -77,8 +77,8 @@ class AuthViewModel(
     }
 
     fun login() {
-        val email = _authUiState.value.email
-        val password = _authUiState.value.password
+        val email = _authUiState.value.email.trim()
+        val password = _authUiState.value.password.trim()
 
         if (email.isBlank() || password.isBlank()) {
             _authUiState.update { it.copy(errorMessage = "Email and password are required") }

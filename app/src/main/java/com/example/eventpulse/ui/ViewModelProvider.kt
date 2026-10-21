@@ -17,6 +17,9 @@ import com.example.eventpulse.data.repository.EventRepository
 import com.example.eventpulse.ui.admin.AdminViewModel
 import com.example.eventpulse.ui.auth.AuthViewModel
 import com.example.eventpulse.ui.chat.ChatViewModel
+import androidx.lifecycle.createSavedStateHandle
+import androidx.lifecycle.viewmodel.CreationExtras
+import com.example.eventpulse.ui.checkout.CheckoutViewModel
 import com.example.eventpulse.ui.organizer.OrganizerViewModel
 import com.example.eventpulse.ui.user.UserViewModel
 
@@ -32,6 +35,32 @@ class EventPulseViewModelFactory(
     private val eventRepository by lazy { EventRepository(api) }
     private val bookingRepository by lazy { BookingRepository(api, database.ticketDao()) }
     private val chatRepository by lazy { ChatRepository(api) }
+
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
+        return when {
+            modelClass.isAssignableFrom(CheckoutViewModel::class.java) -> {
+                val savedStateHandle = extras.createSavedStateHandle()
+                CheckoutViewModel(savedStateHandle, eventRepository, bookingRepository) as T
+            }
+            modelClass.isAssignableFrom(AuthViewModel::class.java) -> {
+                AuthViewModel(authRepository) as T
+            }
+            modelClass.isAssignableFrom(UserViewModel::class.java) -> {
+                UserViewModel(eventRepository, bookingRepository) as T
+            }
+            modelClass.isAssignableFrom(OrganizerViewModel::class.java) -> {
+                OrganizerViewModel(eventRepository, bookingRepository) as T
+            }
+            modelClass.isAssignableFrom(AdminViewModel::class.java) -> {
+                AdminViewModel(eventRepository) as T
+            }
+            modelClass.isAssignableFrom(ChatViewModel::class.java) -> {
+                ChatViewModel(chatRepository) as T
+            }
+            else -> throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
+        }
+    }
 
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -95,6 +124,12 @@ fun adminViewModel(): AdminViewModel {
 
 @Composable
 fun chatViewModel(): ChatViewModel {
+    val factory = rememberViewModelFactory()
+    return viewModel(factory = factory)
+}
+
+@Composable
+fun checkoutViewModel(): CheckoutViewModel {
     val factory = rememberViewModelFactory()
     return viewModel(factory = factory)
 }

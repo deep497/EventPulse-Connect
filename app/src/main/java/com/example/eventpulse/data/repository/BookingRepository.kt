@@ -3,6 +3,10 @@ package com.example.eventpulse.data.repository
 import com.example.eventpulse.data.local.TicketDao
 import com.example.eventpulse.data.local.entities.TicketEntity
 import com.example.eventpulse.data.model.Booking
+import com.example.eventpulse.data.model.ConfirmPaymentRequest
+import com.example.eventpulse.data.model.ConfirmPaymentResponse
+import com.example.eventpulse.data.model.OrderRequest
+import com.example.eventpulse.data.model.OrderResponse
 import com.example.eventpulse.data.remote.EventPulseApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -10,7 +14,7 @@ import kotlinx.coroutines.flow.first
 /**
  * Repository that mediates between [EventPulseApi] (remote) and [TicketDao] (local Room cache).
  *
- * **Offline strategy**: every successful `getMyTickets()` call persists results to Room.
+ * Offline strategy: every successful `getMyTickets()` call persists results to Room.
  * If the server is unreachable, the repository falls back to the locally cached tickets
  * so the user can still view their QR codes without a network connection.
  */
@@ -21,13 +25,6 @@ class BookingRepository(
 
     // ── Ticket listing (with offline fallback) ─────────────────────────────────
 
-    /**
-     * Returns the current user's confirmed bookings.
-     *
-     * 1. Tries `GET /api/bookings/my-tickets`.
-     * 2. On success: writes to Room cache and returns the fresh list.
-     * 3. On failure (network error / server down): reads from Room cache.
-     */
     suspend fun getMyTickets(): Result<List<Booking>> {
         return try {
             val response = api.getMyTickets()
@@ -75,7 +72,6 @@ class BookingRepository(
             if (response.isSuccessful && response.body() != null) {
                 Result.success(response.body()!!)
             } else {
-                // Try local cache
                 val cached = ticketDao.getTicketById(bookingId)?.toBooking()
                 if (cached != null) Result.success(cached)
                 else Result.failure(Exception("Booking not found: ${response.message()}"))
@@ -87,45 +83,110 @@ class BookingRepository(
         }
     }
 
-    // ── Booking creation ───────────────────────────────────────────────────────
+    // ── Payment & Order creation ───────────────────────────────────────────────
 
     /**
-     * Creates a new booking via `POST /api/bookings`.
-     * On success, the returned booking is saved to the local cache immediately.
+     * Creates a payment order and pending booking via `POST /api/payments/order`.
      */
-    suspend fun createBooking(eventId: String, ticketCount: Int): Result<Booking> {
+    suspend fun createPaymentOrder(eventId: String, quantity: Int): Result<OrderResponse> {
         return try {
-            val body = mapOf<String, Any>("eventId" to eventId, "ticketCount" to ticketCount)
-            val response = api.createBooking(body)
+            val response = api.createPaymentOrder(OrderRequest(eventId = eventId, quantity = quantity))
             if (response.isSuccessful && response.body() != null) {
-                val booking = response.body()!!
-                // Cache the new ticket locally
-                ticketDao.insertTicket(booking.toTicketEntity())
-                Result.success(booking)
+                Result.success(response.body()!!)
             } else {
-                Result.failure(Exception("Failed to create booking: ${response.message()}"))
+                Result.failure(Exception(response.errorBody()?.string() ?: response.message()))
             }
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
-    // ── QR Check-in ────────────────────────────────────────────────────────────
+    /**
+     * Confirms payment via `POST /api/payments/confirm`.
+     * On success, caches confirmed ticket in Room.
+     */
+    suspend fun confirmPayment(
+        paymentId: String,
+        result: String,
+        gatewayToken: String? = null
+    ): Result<ConfirmPaymentResponse> {
+        return try {
+            val response = api.confirmPayment(
+                ConfirmPaymentRequest(paymentId = paymentId, result = result, gatewayToken = gatewayToken)
+            )
+            if (response.isSuccessful && response.body() != null) {
+                val confirmResponse = response.body()!!
+                confirmResponse.booking?.let { booking ->
+                    ticketDao.insertTicket(booking.toTicketEntity())
+                }
+                Result.success(confirmResponse)
+            } else {
+                Result.failure(Exception(response.errorBody()?.string() ?: response.message()))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Cancels a booking via `PATCH /api/bookings/:id/cancel` (subject to 48hr policy).
+     */
+    suspend fun cancelBooking(bookingId: String): Result<Map<String, Any>> {
+        return try {
+            val response = api.cancelBooking(bookingId)
+            if (response.isSuccessful && response.body() != null) {
+                ticketDao.updateTicketStatus(bookingId, "CANCELLED")
+                Result.success(response.body()!!)
+            } else {
+                val err = response.errorBody()?.string() ?: response.message()
+                Result.failure(Exception(err))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // Legacy compat
+    suspend fun createBooking(eventId: String, ticketCount: Int): Result<Booking> {
+        return try {
+            val orderResult = createPaymentOrder(eventId, ticketCount)
+            if (orderResult.isFailure) return Result.failure(orderResult.exceptionOrNull()!!)
+            val order = orderResult.getOrThrow()
+            if (order.status == "CONFIRMED") {
+                val b = getBookingById(order.bookingId).getOrThrow()
+                return Result.success(b)
+            }
+            val confirm = confirmPayment(order.paymentId, "SUCCESS").getOrThrow()
+            Result.success(confirm.booking ?: getBookingById(order.bookingId).getOrThrow())
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // ── Check-in (Organizer) ───────────────────────────────────────────────────
 
     /**
      * Organizer check-in via `POST /api/organizer/check-in`.
-     * On success, marks the ticket as checked-in in the local cache too.
+     * Supports both qrCodeHash and manual bookingId entry.
      */
-    suspend fun checkIn(qrCodeHash: String): Result<Map<String, Any>> {
+    suspend fun checkIn(qrCodeHash: String? = null, bookingId: String? = null): Result<Map<String, Any>> {
         return try {
-            val response = api.checkIn(mapOf("qrCodeHash" to qrCodeHash))
+            val body = mutableMapOf<String, String>()
+            if (!qrCodeHash.isNullOrBlank()) body["qrCodeHash"] = qrCodeHash
+            if (!bookingId.isNullOrBlank()) body["bookingId"] = bookingId
+
+            val response = api.checkIn(body)
             if (response.isSuccessful && response.body() != null) {
-                // Reflect check-in locally if we have the ticket cached
-                val cached = ticketDao.getTicketByQrHash(qrCodeHash)
-                cached?.let { ticketDao.markCheckedIn(it.id) }
+                if (!qrCodeHash.isNullOrBlank()) {
+                    val cached = ticketDao.getTicketByQrHash(qrCodeHash)
+                    cached?.let { ticketDao.markCheckedIn(it.id) }
+                } else if (!bookingId.isNullOrBlank()) {
+                    ticketDao.markCheckedIn(bookingId)
+                }
                 Result.success(response.body()!!)
             } else {
-                Result.failure(Exception("Check-in failed: ${response.message()}"))
+                val err = response.errorBody()?.string() ?: response.message()
+                Result.failure(Exception(err))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -135,17 +196,15 @@ class BookingRepository(
     // ── Mappers ────────────────────────────────────────────────────────────────
 
     private fun Booking.toTicketEntity(): TicketEntity {
-        // eventId may be a nested object (populated) or a plain string; handle both
-        val eventName = "" // Populated event name comes via joined query; use empty as placeholder
         return TicketEntity(
             id = this.id,
-            eventId = this.eventId,
-            eventName = eventName,
-            eventDate = "",
-            eventVenue = "",
+            eventId = this.eventIdString,
+            eventName = this.eventTitle.ifBlank { "Event Ticket" },
+            eventDate = this.eventDate,
+            eventVenue = this.eventLocation,
             quantity = this.ticketCount,
             totalPrice = this.totalPrice,
-            qrCodeHash = this.qrCodeHash,
+            qrCodeHash = this.qrCodeHash.ifBlank { "TICKET_${this.id}" },
             bookingDate = parseIsoMillis(this.createdAt),
             status = this.status,
             isCheckedIn = this.isCheckedIn
@@ -163,7 +222,6 @@ class BookingRepository(
         createdAt = this.bookingDate.toString()
     )
 
-    /** Parses an ISO-8601 string to epoch millis; returns 0 on failure. */
     private fun parseIsoMillis(iso: String): Long {
         return try {
             java.time.Instant.parse(iso).toEpochMilli()

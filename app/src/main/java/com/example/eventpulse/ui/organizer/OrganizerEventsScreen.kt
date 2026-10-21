@@ -22,6 +22,10 @@ fun OrganizerEventsScreen(
 ) {
     val uiState by viewModel.organizerUiState.collectAsStateWithLifecycle()
 
+    LaunchedEffect(Unit) {
+        viewModel.loadManagedEvents()
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(

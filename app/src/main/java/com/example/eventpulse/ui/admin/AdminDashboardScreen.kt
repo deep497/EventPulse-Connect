@@ -20,8 +20,10 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import com.example.eventpulse.data.model.Event
+import com.example.eventpulse.ui.authViewModel
 import com.example.eventpulse.ui.components.DarkLightModeToggle
 import com.example.eventpulse.ui.components.GlassCard
+import com.example.eventpulse.ui.navigation.Screen
 import com.example.eventpulse.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -32,6 +34,90 @@ fun AdminDashboardScreen(
 ) {
     val uiState by viewModel.adminUiState.collectAsStateWithLifecycle()
     val isDark = LocalThemeIsDark.current
+    val authVm = authViewModel()
+
+    var eventToReject by remember { mutableStateOf<Event?>(null) }
+    var eventToApprove by remember { mutableStateOf<Event?>(null) }
+    var showLogoutConfirmDialog by remember { mutableStateOf(false) }
+
+    if (showLogoutConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogoutConfirmDialog = false },
+            title = { Text("Logout from Admin Portal?") },
+            text = { Text("Are you sure you want to log out of the administration dashboard?") },
+            confirmButton = {
+                Button(
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    onClick = {
+                        showLogoutConfirmDialog = false
+                        authVm.logout()
+                        navController.navigate(Screen.Login.route) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    }
+                ) {
+                    Text("Logout")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showLogoutConfirmDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (eventToReject != null) {
+        val event = eventToReject!!
+        AlertDialog(
+            onDismissRequest = { eventToReject = null },
+            title = { Text("Reject Event?") },
+            text = { Text("Are you sure you want to reject \"${event.title}\"? This event will not be published.") },
+            confirmButton = {
+                Button(
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    onClick = {
+                        val id = event.id
+                        eventToReject = null
+                        viewModel.rejectEvent(id, "Rejected by administrator")
+                    }
+                ) {
+                    Text("Reject Event")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { eventToReject = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (eventToApprove != null) {
+        val event = eventToApprove!!
+        AlertDialog(
+            onDismissRequest = { eventToApprove = null },
+            title = { Text("Approve & Publish Event?") },
+            text = { Text("Are you sure you want to approve \"${event.title}\"? It will immediately become live for all users on EventPulse.") },
+            confirmButton = {
+                Button(
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                    onClick = {
+                        val id = event.id
+                        eventToApprove = null
+                        viewModel.approveEvent(id)
+                    }
+                ) {
+                    Text("Approve & Publish")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { eventToApprove = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 
     Box(
         modifier = Modifier
@@ -62,7 +148,19 @@ fun AdminDashboardScreen(
                         )
                     }
 
-                    DarkLightModeToggle()
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        DarkLightModeToggle()
+                        Spacer(modifier = Modifier.width(10.dp))
+                        IconButton(
+                            onClick = { showLogoutConfirmDialog = true },
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(StatusRejected.copy(alpha = 0.15f))
+                        ) {
+                            Text("🚪", fontSize = 16.sp)
+                        }
+                    }
                 }
             }
         ) { paddingValues ->
@@ -92,7 +190,7 @@ fun AdminDashboardScreen(
                         NeonMetricCard(
                             title = "Total Users",
                             value = uiState.totalUsers.toString(),
-                            subtitle = "+8% this month",
+                            subtitle = "${uiState.totalUsers} registered",
                             badgeColor = StatusPublished,
                             modifier = Modifier.weight(1f)
                         )
@@ -124,7 +222,7 @@ fun AdminDashboardScreen(
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = if (uiState.totalRevenue <= 0) "₹12,500.00" else "₹${String.format("%.2f", uiState.totalRevenue)}",
+                                    text = "₹${String.format("%.2f", uiState.totalRevenue)}",
                                     style = MaterialTheme.typography.headlineLarge,
                                     fontWeight = FontWeight.ExtraBold,
                                     color = if (isDark) NeonCyan else ElectricPurple
@@ -250,8 +348,8 @@ fun AdminDashboardScreen(
                     items(uiState.pendingEvents) { event ->
                         NeonPendingEventCard(
                             event = event,
-                            onApprove = { viewModel.approveEvent(event.id) },
-                            onReject = { viewModel.rejectEvent(event.id, "Policy violation") }
+                            onApprove = { eventToApprove = event },
+                            onReject = { eventToReject = event }
                         )
                     }
                 }

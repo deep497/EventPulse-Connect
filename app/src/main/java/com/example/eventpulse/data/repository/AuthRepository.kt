@@ -57,13 +57,20 @@ class AuthRepository(
      */
     suspend fun login(email: String, password: String): Result<User> {
         return try {
-            val body = mapOf("email" to email, "password" to password)
+            val cleanEmail = email.trim()
+            val cleanPassword = password.trim()
+            val body = mapOf("email" to cleanEmail, "password" to cleanPassword)
             val response = api.login(body)
             if (response.isSuccessful && response.body() != null) {
                 val user = parseAuthResponse(response.body()!!)
                 Result.success(user)
             } else {
-                Result.failure(Exception("Login failed: ${response.message()}"))
+                val errJson = response.errorBody()?.string()
+                val serverMsg = try {
+                    com.google.gson.JsonParser.parseString(errJson).asJsonObject.get("message")?.asString
+                } catch (_: Exception) { null }
+                val errorMsg = serverMsg ?: "Login failed (${response.code()}: ${response.message()})"
+                Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -74,8 +81,23 @@ class AuthRepository(
 
     suspend fun logout() = sessionManager.clearSession()
 
-    suspend fun updateProfile(name: String, email: String) {
-        sessionManager.saveUserDetails(name, email)
+    suspend fun updateProfile(name: String, email: String, phoneNumber: String = ""): Result<User> {
+        return try {
+            val body = mutableMapOf("name" to name)
+            if (phoneNumber.isNotBlank()) body["phoneNumber"] = phoneNumber
+            val response = api.updateProfile(body)
+            if (response.isSuccessful && response.body() != null) {
+                val updated = response.body()!!
+                sessionManager.saveUserDetails(updated.name, updated.email)
+                Result.success(updated)
+            } else {
+                sessionManager.saveUserDetails(name, email)
+                Result.success(User(name = name, email = email, phoneNumber = phoneNumber))
+            }
+        } catch (e: Exception) {
+            sessionManager.saveUserDetails(name, email)
+            Result.success(User(name = name, email = email, phoneNumber = phoneNumber))
+        }
     }
 
     fun getJwtToken(): Flow<String?> = sessionManager.getJwtToken()

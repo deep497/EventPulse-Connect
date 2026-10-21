@@ -1,6 +1,7 @@
 package com.example.eventpulse.data.repository
 
 import com.example.eventpulse.data.model.Event
+import com.example.eventpulse.data.model.User
 import com.example.eventpulse.data.remote.EventPulseApi
 
 /**
@@ -151,6 +152,34 @@ class EventRepository(
                 Result.success(response.body()!!)
             } else {
                 Result.failure(Exception("Failed to fetch metrics: ${response.message()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /** `GET /api/admin/users` – returns all users for moderation. */
+    suspend fun getAdminUsers(): Result<List<User>> {
+        return try {
+            val response = api.getAdminUsers()
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                Result.failure(Exception("Failed to fetch users: ${response.message()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /** `PATCH /api/admin/users/:id/block` – blocks or unblocks a user. */
+    suspend fun setUserBlockedStatus(userId: String, isBlocked: Boolean): Result<Map<String, Any>> {
+        return try {
+            val response = api.setUserBlockedStatus(userId, mapOf("isBlocked" to isBlocked))
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                Result.failure(Exception("Failed to update user block status: ${response.message()}"))
             }
         } catch (e: Exception) {
             Result.failure(e)

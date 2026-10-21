@@ -67,6 +67,8 @@ class OrganizerViewModel(
         }
     }
 
+    fun loadManagedEvents() = loadOrganizerEvents()
+
     fun createEvent(event: Event) {
         viewModelScope.launch {
             _organizerUiState.update { it.copy(isLoading = true, errorMessage = null) }
@@ -139,26 +141,35 @@ class OrganizerViewModel(
     }
 
     /**
-     * Performs QR check-in via POST /api/organizer/check-in.
+     * Performs check-in via POST /api/organizer/check-in.
      * @param qrCodeHash SHA-256 hash scanned from the attendee's ticket QR code.
+     * @param bookingId Manual booking ID entered by the organizer.
      */
-    fun checkIn(qrCodeHash: String) {
+    fun checkIn(
+        qrCodeHash: String? = null,
+        bookingId: String? = null,
+        onResult: ((Boolean, String) -> Unit)? = null
+    ) {
         viewModelScope.launch {
             _organizerUiState.update { it.copy(isLoading = true, errorMessage = null) }
 
-            val result = bookingRepository.checkIn(qrCodeHash)
+            val result = bookingRepository.checkIn(qrCodeHash, bookingId)
             result.fold(
-                onSuccess = {
+                onSuccess = { res ->
+                    val msg = (res["message"] as? String) ?: "Attendee checked in successfully"
                     _organizerUiState.update { it.copy(
                         isLoading = false,
-                        successMessage = "Attendee checked in successfully"
+                        successMessage = msg
                     )}
+                    onResult?.invoke(true, msg)
                 },
                 onFailure = { exception ->
+                    val err = exception.message ?: "Check-in failed"
                     _organizerUiState.update { it.copy(
                         isLoading = false,
-                        errorMessage = exception.message ?: "Check-in failed"
+                        errorMessage = err
                     )}
+                    onResult?.invoke(false, err)
                 }
             )
         }

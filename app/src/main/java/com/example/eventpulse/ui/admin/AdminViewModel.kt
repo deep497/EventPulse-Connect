@@ -118,12 +118,42 @@ class AdminViewModel(
 
     // ── User management ────────────────────────────────────────────────────────
 
-    fun suspendUser(userId: String) {
-        // TODO: wire to a future /api/admin/users/:id/suspend endpoint
+    fun loadUsers() {
         viewModelScope.launch {
-            _adminUiState.update { it.copy(successMessage = "User $userId suspended (local)") }
+            _adminUiState.update { it.copy(isLoading = true, errorMessage = null) }
+            eventRepository.getAdminUsers()
+                .onSuccess { users ->
+                    _adminUiState.update { it.copy(isLoading = false, users = users) }
+                }
+                .onFailure { err ->
+                    _adminUiState.update { it.copy(isLoading = false, errorMessage = err.message) }
+                }
         }
     }
+
+    fun setUserBlockedStatus(userId: String, isBlocked: Boolean) {
+        viewModelScope.launch {
+            _adminUiState.update { it.copy(isLoading = true, errorMessage = null) }
+            eventRepository.setUserBlockedStatus(userId, isBlocked)
+                .onSuccess {
+                    _adminUiState.update { state ->
+                        val updatedUsers = state.users.map { u ->
+                            if (u.id == userId) u.copy(isBlocked = isBlocked) else u
+                        }
+                        state.copy(
+                            isLoading = false,
+                            users = updatedUsers,
+                            successMessage = if (isBlocked) "User blocked successfully" else "User unblocked successfully"
+                        )
+                    }
+                }
+                .onFailure { err ->
+                    _adminUiState.update { it.copy(isLoading = false, errorMessage = err.message) }
+                }
+        }
+    }
+
+    fun suspendUser(userId: String) = setUserBlockedStatus(userId, true)
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 

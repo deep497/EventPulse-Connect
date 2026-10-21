@@ -12,6 +12,8 @@ import com.example.eventpulse.ui.auth.SignupScreen
 import com.example.eventpulse.ui.authViewModel
 import com.example.eventpulse.ui.userViewModel
 import com.example.eventpulse.ui.organizerViewModel
+import com.example.eventpulse.ui.checkoutViewModel
+import com.example.eventpulse.ui.checkout.CheckoutScreen
 import com.example.eventpulse.ui.organizer.CreateEditEventScreen
 import com.example.eventpulse.ui.organizer.OrganizerMainScreen
 import com.example.eventpulse.ui.organizer.QrScannerScreen
@@ -57,6 +59,26 @@ fun AppNavGraph(
                 navController = navController,
                 eventId = eventId,
                 viewModel = userViewModel()
+            )
+        }
+
+        composable(
+            route = Screen.Checkout.route,
+            arguments = listOf(
+                navArgument("eventId") { type = NavType.StringType },
+                navArgument("quantity") {
+                    type = NavType.IntType
+                    defaultValue = 1
+                }
+            )
+        ) { backStackEntry ->
+            val eventId = backStackEntry.arguments?.getString("eventId") ?: ""
+            val quantity = backStackEntry.arguments?.getInt("quantity") ?: 1
+            CheckoutScreen(
+                navController = navController,
+                eventId = eventId,
+                initialQuantity = quantity,
+                viewModel = checkoutViewModel()
             )
         }
 

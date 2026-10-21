@@ -18,6 +18,7 @@ data class UserUiState(
     val selectedCategory: String = "All",
     val categories: List<String> = listOf("All", "Music", "Tech", "Art", "Sports"),
     val recommendedEvents: List<Event> = emptyList(),
+    val favoriteEventIds: Set<String> = emptySet(),
     val selectedEvent: Event? = null,
     val bookings: List<Booking> = emptyList(),
     val isLoading: Boolean = false,
@@ -34,6 +35,17 @@ class UserViewModel(
 
     init {
         loadEvents()
+    }
+
+    fun toggleFavorite(eventId: String) {
+        _userUiState.update { current ->
+            val updated = if (current.favoriteEventIds.contains(eventId)) {
+                current.favoriteEventIds - eventId
+            } else {
+                current.favoriteEventIds + eventId
+            }
+            current.copy(favoriteEventIds = updated)
+        }
     }
 
     fun updateSearchQuery(query: String) {
@@ -97,8 +109,7 @@ class UserViewModel(
     fun loadBookings() {
         viewModelScope.launch {
             _userUiState.update { it.copy(isLoading = true, errorMessage = null) }
-            
-            val result = bookingRepository.getBookings()
+            val result = bookingRepository.getMyTickets()
             result.fold(
                 onSuccess = { bookings ->
                     _userUiState.update { it.copy(
@@ -111,6 +122,28 @@ class UserViewModel(
                         isLoading = false,
                         errorMessage = exception.message ?: "Failed to load bookings"
                     )}
+                }
+            )
+        }
+    }
+
+    fun cancelBooking(bookingId: String, onComplete: (Boolean, String) -> Unit) {
+        viewModelScope.launch {
+            _userUiState.update { it.copy(isLoading = true, errorMessage = null) }
+            val result = bookingRepository.cancelBooking(bookingId)
+            result.fold(
+                onSuccess = { response ->
+                    val message = (response["message"] as? String) ?: "Booking cancelled successfully"
+                    // Refresh bookings list
+                    loadBookings()
+                    onComplete(true, message)
+                },
+                onFailure = { exception ->
+                    _userUiState.update { it.copy(
+                        isLoading = false,
+                        errorMessage = exception.message ?: "Failed to cancel booking"
+                    )}
+                    onComplete(false, exception.message ?: "Cancellation failed")
                 }
             )
         }
