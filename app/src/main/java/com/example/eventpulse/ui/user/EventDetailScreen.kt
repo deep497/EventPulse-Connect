@@ -19,6 +19,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
+import com.example.eventpulse.ui.components.ExpiredBadge
+import com.example.eventpulse.ui.components.expiredStyle
 import com.example.eventpulse.ui.components.GlassCard
 import com.example.eventpulse.ui.navigation.Screen
 import com.example.eventpulse.ui.theme.*
@@ -137,7 +139,12 @@ fun EventDetailScreen(
                                 fontWeight = FontWeight.ExtraBold,
                                 color = if (isDark) UserDarkTextPrimary else UserLightTextPrimary
                             )
-                            if (event.availableSeats > 0) {
+                            if (event.isExpired) {
+                                ExpiredBadge(
+                                    text = "This event has ended",
+                                    modifier = Modifier.padding(top = 6.dp)
+                                )
+                            } else if (event.availableSeats > 0) {
                                 Text(
                                     text = "🔥 ${event.availableSeats} seats available",
                                     style = MaterialTheme.typography.bodySmall,
@@ -224,124 +231,151 @@ fun EventDetailScreen(
                     )
                 }
 
-                // Bottom Ticket Booking Card
-                Surface(
-                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-                    color = if (isDark) Color(0xFF1F1722) else Color(0xFFFFF9F8),
-                    tonalElevation = 8.dp,
-                    shadowElevation = 8.dp,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
+                // Bottom Ticket Booking Card / Expired Notice
+                if (event.isExpired) {
+                    Surface(
+                        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                        color = if (isDark) Color(0xFF1F1722) else Color(0xFFFFF9F8),
+                        tonalElevation = 8.dp,
+                        shadowElevation = 8.dp,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                            .expiredStyle(true)
                     ) {
-                        // Ticket Quantity Stepper
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Column {
-                                Text(
-                                    text = "Select Tickets",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = "Max ${event.availableSeats.coerceAtMost(10)} per order",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = if (isDark) UserDarkTextSecondary else UserLightTextSecondary
-                                )
-                            }
-
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                FilledIconButton(
-                                    onClick = { if (ticketQuantity > 1) ticketQuantity-- },
-                                    enabled = ticketQuantity > 1,
-                                    colors = IconButtonDefaults.filledIconButtonColors(
-                                        containerColor = if (isDark) Color(0xFF382736) else Color(0xFFFFECE7)
-                                    )
-                                ) {
-                                    Text(
-                                        text = "−",
-                                        style = MaterialTheme.typography.titleLarge,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (ticketQuantity > 1) CoralPrimary else Color.Gray
-                                    )
-                                }
-
-                                Text(
-                                    text = ticketQuantity.toString(),
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    modifier = Modifier.widthIn(min = 28.dp)
-                                )
-
-                                FilledIconButton(
-                                    onClick = {
-                                        if (ticketQuantity < event.availableSeats && ticketQuantity < 10) {
-                                            ticketQuantity++
-                                        }
-                                    },
-                                    enabled = ticketQuantity < event.availableSeats && ticketQuantity < 10,
-                                    colors = IconButtonDefaults.filledIconButtonColors(
-                                        containerColor = if (isDark) Color(0xFF382736) else Color(0xFFFFECE7)
-                                    )
-                                ) {
-                                    Text(
-                                        text = "+",
-                                        style = MaterialTheme.typography.titleLarge,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (ticketQuantity < event.availableSeats) CoralPrimary else Color.Gray
-                                    )
-                                }
-                            }
+                            ExpiredBadge(text = "This event has ended")
+                            Text(
+                                text = "Ticket booking and registrations are closed for this past event.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (isDark) UserDarkTextSecondary else UserLightTextSecondary
+                            )
                         }
-
-                        HorizontalDivider(color = Color(0x22888888))
-
-                        // Total Price & Checkout Button Row
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                    }
+                } else {
+                    Surface(
+                        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                        color = if (isDark) Color(0xFF1F1722) else Color(0xFFFFF9F8),
+                        tonalElevation = 8.dp,
+                        shadowElevation = 8.dp,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
-                            Column {
-                                Text(
-                                    text = "Total Price",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = if (isDark) UserDarkTextSecondary else UserLightTextSecondary
-                                )
-                                Text(
-                                    text = if (totalPrice > 0) "₹${totalPrice.toInt()}" else "Free",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = CoralPrimary
-                                )
+                            // Ticket Quantity Stepper
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        text = "Select Tickets",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "Max ${event.availableSeats.coerceAtMost(10)} per order",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = if (isDark) UserDarkTextSecondary else UserLightTextSecondary
+                                    )
+                                }
+
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    FilledIconButton(
+                                        onClick = { if (ticketQuantity > 1) ticketQuantity-- },
+                                        enabled = ticketQuantity > 1,
+                                        colors = IconButtonDefaults.filledIconButtonColors(
+                                            containerColor = if (isDark) Color(0xFF382736) else Color(0xFFFFECE7)
+                                        )
+                                    ) {
+                                        Text(
+                                            text = "−",
+                                            style = MaterialTheme.typography.titleLarge,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (ticketQuantity > 1) CoralPrimary else Color.Gray
+                                        )
+                                    }
+
+                                    Text(
+                                        text = ticketQuantity.toString(),
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        modifier = Modifier.widthIn(min = 28.dp)
+                                    )
+
+                                    FilledIconButton(
+                                        onClick = {
+                                            if (ticketQuantity < event.availableSeats && ticketQuantity < 10) {
+                                                ticketQuantity++
+                                            }
+                                        },
+                                        enabled = ticketQuantity < event.availableSeats && ticketQuantity < 10,
+                                        colors = IconButtonDefaults.filledIconButtonColors(
+                                            containerColor = if (isDark) Color(0xFF382736) else Color(0xFFFFECE7)
+                                        )
+                                    ) {
+                                        Text(
+                                            text = "+",
+                                            style = MaterialTheme.typography.titleLarge,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (ticketQuantity < event.availableSeats) CoralPrimary else Color.Gray
+                                        )
+                                    }
+                                }
                             }
 
-                            Button(
-                                onClick = {
-                                    navController.navigate(Screen.Checkout.createRoute(eventId, ticketQuantity))
-                                },
-                                enabled = event.availableSeats > 0,
-                                colors = ButtonDefaults.buttonColors(containerColor = CoralPrimary),
-                                shape = RoundedCornerShape(14.dp),
-                                modifier = Modifier
-                                    .height(48.dp)
-                                    .padding(start = 16.dp)
+                            HorizontalDivider(color = Color(0x22888888))
+
+                            // Total Price & Checkout Button Row
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = if (event.price == 0.0) "Register Free" else "Proceed to Checkout",
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
+                                Column {
+                                    Text(
+                                        text = "Total Price",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = if (isDark) UserDarkTextSecondary else UserLightTextSecondary
+                                    )
+                                    Text(
+                                        text = if (totalPrice > 0) "₹${totalPrice.toInt()}" else "Free",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = CoralPrimary
+                                    )
+                                }
+
+                                Button(
+                                    onClick = {
+                                        navController.navigate(Screen.Checkout.createRoute(eventId, ticketQuantity))
+                                    },
+                                    enabled = event.availableSeats > 0,
+                                    colors = ButtonDefaults.buttonColors(containerColor = CoralPrimary),
+                                    shape = RoundedCornerShape(14.dp),
+                                    modifier = Modifier
+                                        .height(48.dp)
+                                        .padding(start = 16.dp)
+                                ) {
+                                    Text(
+                                        text = if (event.price == 0.0) "Register Free" else "Proceed to Checkout",
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
                             }
                         }
                     }

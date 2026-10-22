@@ -2,6 +2,7 @@ package com.example.eventpulse.ui.admin
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -27,11 +28,17 @@ fun AdminUsersScreen(
 ) {
     val uiState by viewModel.adminUiState.collectAsStateWithLifecycle()
     val authVm = authViewModel()
+    val authState by authVm.authUiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
 
     var userToToggleBlock by remember { mutableStateOf<User?>(null) }
     var showLogoutConfirmDialog by remember { mutableStateOf(false) }
+
+    var selectedRoleFilter by remember { mutableStateOf("All") }
+    val roleFilters = listOf("All", "User", "Organizers", "Admin")
+
+    val currentAdminEmail = authState.email.ifBlank { authState.user?.email ?: "" }
+    val currentAdminId = authState.user?.id ?: ""
 
     LaunchedEffect(Unit) {
         viewModel.loadUsers()
@@ -45,6 +52,27 @@ fun AdminUsersScreen(
         uiState.errorMessage?.let {
             snackbarHostState.showSnackbar(it)
             viewModel.clearMessages()
+        }
+    }
+
+    // Filtered user list respecting developer privacy (only current admin is visible)
+    val filteredUsers = remember(uiState.users, selectedRoleFilter, currentAdminEmail, currentAdminId) {
+        uiState.users.filter { user ->
+            val isAdmin = user.role == Role.ADMIN
+            val isCurrentAdmin = isAdmin && (
+                (currentAdminEmail.isNotBlank() && user.email.equals(currentAdminEmail, ignoreCase = true)) ||
+                (currentAdminId.isNotBlank() && user.id == currentAdminId)
+            )
+
+            when (selectedRoleFilter) {
+                "User" -> user.role == Role.USER
+                "Organizers" -> user.role == Role.ORGANIZER
+                "Admin" -> isCurrentAdmin
+                else -> {
+                    // "All": show all Users and Organizers, but ONLY the current Admin
+                    user.role == Role.USER || user.role == Role.ORGANIZER || isCurrentAdmin
+                }
+            }
         }
     }
 
@@ -132,46 +160,93 @@ fun AdminUsersScreen(
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { paddingValues ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            when {
-                uiState.isLoading && uiState.users.isEmpty() -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
+            // 4 Filter Buttons Row: All, User, Organizers, Admin
+            LazyRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(roleFilters) { filter ->
+                    val isSelected = selectedRoleFilter == filter
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { selectedRoleFilter = filter },
+                        label = {
+                            val count = when (filter) {
+                                "User" -> uiState.users.count { it.role == Role.USER }
+                                "Organizers" -> uiState.users.count { it.role == Role.ORGANIZER }
+                                "Admin" -> if (currentAdminEmail.isNotBlank() || currentAdminId.isNotBlank()) 1 else uiState.users.count { it.role == Role.ADMIN }
+                                else -> uiState.users.count {
+                                    val isCurAdmin = it.role == Role.ADMIN && (
+                                        (currentAdminEmail.isNotBlank() && it.email.equals(currentAdminEmail, ignoreCase = true)) ||
+                                        (currentAdminId.isNotBlank() && it.id == currentAdminId)
+                                    )
+                                    it.role == Role.USER || it.role == Role.ORGANIZER || isCurAdmin
+                                }
+                            }
+                            Text("$filter ($count)")
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primary,
+                            selectedLabelColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    )
                 }
-                uiState.users.isEmpty() -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(24.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("👥", style = MaterialTheme.typography.displayMedium)
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                "No Users Found",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp)
+            ) {
+                when {
+                    uiState.isLoading && uiState.users.isEmpty() -> {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
                         }
                     }
-                }
-                else -> {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(uiState.users) { user ->
-                            UserModerationCard(
-                                user = user,
-                                onToggleBlock = { userToToggleBlock = user }
-                            )
+                    filteredUsers.isEmpty() -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("👥", style = MaterialTheme.typography.displayMedium)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = if (uiState.users.isEmpty()) "No Users Found" else "No $selectedRoleFilter Accounts Found",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                    else -> {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(top = 8.dp, bottom = 20.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(filteredUsers) { user ->
+                                val isSelf = user.role == Role.ADMIN && (
+                                    (currentAdminEmail.isNotBlank() && user.email.equals(currentAdminEmail, ignoreCase = true)) ||
+                                    (currentAdminId.isNotBlank() && user.id == currentAdminId)
+                                )
+                                UserModerationCard(
+                                    user = user,
+                                    isSelf = isSelf,
+                                    onToggleBlock = { userToToggleBlock = user }
+                                )
+                            }
                         }
                     }
                 }
@@ -183,6 +258,7 @@ fun AdminUsersScreen(
 @Composable
 private fun UserModerationCard(
     user: User,
+    isSelf: Boolean = false,
     onToggleBlock: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -202,11 +278,28 @@ private fun UserModerationCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = user.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = user.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        if (isSelf) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                modifier = Modifier.padding(start = 6.dp)
+                            ) {
+                                Text(
+                                    text = "YOU",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
+                                )
+                            }
+                        }
+                    }
                     Text(
                         text = user.email,
                         style = MaterialTheme.typography.bodyMedium,

@@ -47,7 +47,7 @@ class EventPulseViewModelFactory(
                 AuthViewModel(authRepository) as T
             }
             modelClass.isAssignableFrom(UserViewModel::class.java) -> {
-                UserViewModel(eventRepository, bookingRepository) as T
+                UserViewModel(eventRepository, bookingRepository, sessionManager) as T
             }
             modelClass.isAssignableFrom(OrganizerViewModel::class.java) -> {
                 OrganizerViewModel(eventRepository, bookingRepository) as T
@@ -69,7 +69,7 @@ class EventPulseViewModelFactory(
                 AuthViewModel(authRepository) as T
             }
             modelClass.isAssignableFrom(UserViewModel::class.java) -> {
-                UserViewModel(eventRepository, bookingRepository) as T
+                UserViewModel(eventRepository, bookingRepository, sessionManager) as T
             }
             modelClass.isAssignableFrom(OrganizerViewModel::class.java) -> {
                 OrganizerViewModel(eventRepository, bookingRepository) as T

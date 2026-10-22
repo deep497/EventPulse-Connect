@@ -28,7 +28,11 @@ const paymentProvider = getPaymentProvider(PAYMENT_MODE);
 // ─── MongoDB Connection ────────────────────────────────────────────────────────
 mongoose
   .connect(MONGODB_URI)
-  .then(() => console.log('[MongoDB] Connected to Atlas ✔'))
+  .then(async () => {
+    console.log('[MongoDB] Connected to Atlas ✔');
+    await backfillEventDates();
+    await sweepExpiredBookings();
+  })
   .catch((err) => console.error('[MongoDB] Connection error:', err.message));
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -56,6 +60,8 @@ const eventSchema = new mongoose.Schema(
     description: { type: String, required: true },
     category: { type: String, required: true },
     date: { type: String, required: true },
+    startDateTime: { type: Date },
+    endDateTime: { type: Date },
     location: { type: String, required: true },
     price: { type: Number, default: 0, min: 0 },
     totalSeats: { type: Number, required: true, default: 100, min: 1 },
@@ -71,6 +77,8 @@ const eventSchema = new mongoose.Schema(
   { timestamps: true }
 );
 eventSchema.index({ title: 'text', description: 'text', location: 'text' });
+eventSchema.index({ startDateTime: 1 });
+eventSchema.index({ endDateTime: 1 });
 const Event = mongoose.model('Event', eventSchema);
 
 // ─── Payment ──────────────────────────────────────────────────────────────────
@@ -156,6 +164,117 @@ const generateQrHash = (bookingId, userId) => {
     .createHash('sha256')
     .update(`${bookingId}-${userId}-${Date.now()}-${Math.random()}`)
     .digest('hex');
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TIME & EXPIRY LOGIC (Server UTC source of truth)
+// ═══════════════════════════════════════════════════════════════════════════════
+const DEFAULT_EVENT_DURATION_HOURS = 3;
+const DEFAULT_EVENT_DURATION_MS = DEFAULT_EVENT_DURATION_HOURS * 60 * 60 * 1000;
+const ALLOW_BOOKING_AFTER_START = false;
+
+function parseEventDate(dateVal) {
+  if (!dateVal) return null;
+  if (dateVal instanceof Date && !isNaN(dateVal.getTime())) return dateVal;
+  let str = String(dateVal).trim();
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$/.test(str)) {
+    str = str.replace(' ', 'T');
+  }
+  const parsed = new Date(str);
+  if (!isNaN(parsed.getTime())) return parsed;
+  return null;
+}
+
+function getEventTiming(event) {
+  let startMs = null;
+  if (event.startDateTime) {
+    const s = new Date(event.startDateTime);
+    if (!isNaN(s.getTime())) startMs = s.getTime();
+  }
+  if (!startMs && event.date) {
+    const d = parseEventDate(event.date);
+    if (d) startMs = d.getTime();
+  }
+  if (!startMs) {
+    startMs = event.createdAt ? new Date(event.createdAt).getTime() : Date.now();
+  }
+
+  let endMs = null;
+  if (event.endDateTime) {
+    const e = new Date(event.endDateTime);
+    if (!isNaN(e.getTime())) endMs = e.getTime();
+  }
+  if (!endMs) {
+    endMs = startMs + DEFAULT_EVENT_DURATION_MS;
+  }
+
+  const now = Date.now();
+  const isStarted = now >= startMs;
+  const isEnded = now >= endMs;
+  const isExpired = isEnded;
+
+  let timeStatus = 'UPCOMING';
+  if (isEnded) {
+    timeStatus = 'EXPIRED';
+  } else if (isStarted) {
+    timeStatus = 'ONGOING';
+  }
+
+  return {
+    startMs,
+    endMs,
+    startDate: new Date(startMs),
+    endDate: new Date(endMs),
+    isStarted,
+    isEnded,
+    isExpired,
+    timeStatus,
+  };
+}
+
+function formatEventJson(eventDoc) {
+  const obj = eventDoc.toObject ? eventDoc.toObject() : { ...eventDoc };
+  const timing = getEventTiming(obj);
+  obj.isExpired = timing.isExpired;
+  obj.timeStatus = timing.timeStatus;
+  obj.eventStatus = timing.timeStatus;
+  obj.startDateTime = timing.startDate.toISOString();
+  obj.endDateTime = timing.endDate.toISOString();
+  return obj;
+}
+
+function computeBookingTicketState(booking, eventDoc) {
+  if (booking.status === 'CANCELLED') return 'CANCELLED';
+  if (booking.status === 'USED' || booking.isCheckedIn) return 'USED';
+  if (eventDoc) {
+    const timing = getEventTiming(eventDoc);
+    if (timing.isExpired) return 'EXPIRED';
+  }
+  return 'ACTIVE';
+}
+
+const backfillEventDates = async () => {
+  try {
+    const events = await Event.find({
+      $or: [
+        { startDateTime: { $exists: false } },
+        { endDateTime: { $exists: false } },
+        { startDateTime: null },
+        { endDateTime: null }
+      ]
+    });
+    for (const ev of events) {
+      const timing = getEventTiming(ev);
+      ev.startDateTime = timing.startDate;
+      ev.endDateTime = timing.endDate;
+      await ev.save();
+    }
+    if (events.length > 0) {
+      console.log(`[Backfill] Backfilled startDateTime & endDateTime for ${events.length} events.`);
+    }
+  } catch (err) {
+    console.error('[Backfill Error]:', err.message);
+  }
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -298,57 +417,195 @@ authRouter.put('/profile', authenticate, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════════
 const eventsRouter = express.Router();
 
-// GET /api/events  – public, supports ?status=&category=&search=
+// GET /api/events  – public explore/search/category list, supports ?status=&category=&search=&includePast=
 eventsRouter.get('/', async (req, res) => {
   try {
-    const { status, category, search } = req.query;
+    const { status, category, search, includePast } = req.query;
+
+    // Optional auth check for includePast permission
+    let userRole = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
+        userRole = decoded.role;
+      } catch (_) {}
+    }
+
+    const canIncludePast = (includePast === 'true') && (userRole === 'ORGANIZER' || userRole === 'ADMIN');
+
     const filter = {};
     if (status) filter.status = status;
     else filter.status = 'PUBLISHED';
     if (category && category !== 'All') filter.category = new RegExp(`^${category}$`, 'i');
     if (search) filter.$text = { $search: search };
 
-    const events = await Event.find(filter).sort({ createdAt: -1 });
-    res.json(events);
+    const events = await Event.find(filter);
+
+    // Filter defensively by server-computed expiry
+    const filteredEvents = events.filter((ev) => {
+      const timing = getEventTiming(ev);
+      if (canIncludePast) return true;
+      // Explore/category lists show only upcoming & ongoing APPROVED events
+      return !timing.isExpired && ev.status === 'PUBLISHED';
+    });
+
+    // Sort by start date ascending (soonest event first)
+    filteredEvents.sort((a, b) => {
+      const tA = getEventTiming(a);
+      const tB = getEventTiming(b);
+      return tA.startMs - tB.startMs;
+    });
+
+    res.json(filteredEvents.map(formatEventJson));
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
-// GET /api/events/organizer – organizer's own events
-eventsRouter.get('/organizer', authenticate, requireRole('ORGANIZER', 'ADMIN'), async (req, res) => {
+// Helper for organizer events (used by /mine and /organizer)
+const handleOrganizerEvents = async (req, res) => {
   try {
-    const events = await Event.find({ organizerId: req.user.id }).sort({ createdAt: -1 });
-    res.json(events);
+    const events = await Event.find({ organizerId: req.user.id });
+
+    const active = [];
+    const past = [];
+
+    events.forEach((ev) => {
+      const timing = getEventTiming(ev);
+      if (timing.isExpired) {
+        past.push(ev);
+      } else {
+        active.push(ev);
+      }
+    });
+
+    // Active (upcoming and ongoing): soonest first (ascending)
+    active.sort((a, b) => getEventTiming(a).startMs - getEventTiming(b).startMs);
+
+    // Past (expired): most recent first (descending)
+    past.sort((a, b) => getEventTiming(b).startMs - getEventTiming(a).startMs);
+
+    const ordered = [...active, ...past].map(formatEventJson);
+    res.json(ordered);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
+// GET /api/events/mine (Organiser: active upcoming first, past below)
+eventsRouter.get('/mine', authenticate, requireRole('ORGANIZER', 'ADMIN'), handleOrganizerEvents);
+
+// GET /api/events/organizer (backward compatibility)
+eventsRouter.get('/organizer', authenticate, requireRole('ORGANIZER', 'ADMIN'), handleOrganizerEvents);
+
+// GET /api/events/:id/attendees – attendance stats & attendee list
+eventsRouter.get('/:id/attendees', authenticate, requireRole('ORGANIZER', 'ADMIN'), async (req, res) => {
+  try {
+    const event = await Event.findById(req.params.id);
+    if (!event) return res.status(404).json({ message: 'Event not found' });
+
+    if (event.organizerId.toString() !== req.user.id && req.user.role !== 'ADMIN') {
+      return res.status(403).json({ message: 'Forbidden – not your event' });
+    }
+
+    const bookings = await Booking.find({
+      eventId: event._id,
+      status: { $in: ['CONFIRMED', 'USED'] },
+    })
+      .populate('userId', 'name email phoneNumber')
+      .sort({ createdAt: -1 });
+
+    const timing = getEventTiming(event);
+    let totalBooked = 0;
+    let checkedInCount = 0;
+
+    const formattedBookings = bookings.map((b) => {
+      const quantity = b.ticketCount || 1;
+      const checkedIn = b.isCheckedIn || b.status === 'USED';
+      totalBooked += quantity;
+      if (checkedIn) checkedInCount += quantity;
+
+      return {
+        bookingId: b._id.toString(),
+        eventId: event._id.toString(),
+        eventTitle: event.title,
+        eventDate: event.date,
+        eventLocation: event.location,
+        userName: b.userId?.name || 'Attendee',
+        userEmail: b.userId?.email || '',
+        userPhone: b.userId?.phoneNumber || '',
+        ticketCount: quantity,
+        quantity,
+        totalPrice: b.totalPrice,
+        status: b.status,
+        isCheckedIn: checkedIn,
+        checkedIn,
+        checkedInAt: b.checkedInAt ? b.checkedInAt.toISOString() : null,
+        bookedAt: b.createdAt ? b.createdAt.toISOString() : null,
+        qrCodeHash: b.qrCodeHash || '',
+        isExpired: timing.isExpired,
+      };
+    });
+
+    const noShowCount = Math.max(0, totalBooked - checkedInCount);
+
+    res.json({
+      bookings: formattedBookings,
+      attendees: formattedBookings,
+      summary: {
+        totalBooked,
+        checkedInCount,
+        noShowCount,
+      },
+      isExpired: timing.isExpired,
+    });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
-// GET /api/events/:id
+// GET /api/events/:id – returns single event with isExpired
 eventsRouter.get('/:id', async (req, res) => {
   try {
     const event = await Event.findById(req.params.id);
     if (!event) return res.status(404).json({ message: 'Event not found' });
-    res.json(event);
+    res.json(formatEventJson(event));
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
-// POST /api/events – organizer creates event (defaults to PENDING_APPROVAL)
+// POST /api/events – organizer creates event (validates future date)
 eventsRouter.post('/', authenticate, requireRole('ORGANIZER', 'ADMIN'), async (req, res) => {
   try {
-    const { title, description, category, date, location, price, totalSeats, imageUrl } = req.body;
+    const { title, description, category, date, location, price, totalSeats, imageUrl, endDateTime } = req.body;
     if (!title || !description || !category || !date || !location) {
       return res.status(400).json({ message: 'title, description, category, date, and location are required' });
     }
+
+    const parsedStart = parseEventDate(date);
+    if (!parsedStart || isNaN(parsedStart.getTime())) {
+      return res.status(400).json({ message: 'Invalid event date format' });
+    }
+
+    if (parsedStart.getTime() <= Date.now()) {
+      return res.status(400).json({ message: 'Event date and time must be in the future.' });
+    }
+
+    let parsedEnd = endDateTime ? parseEventDate(endDateTime) : null;
+    if (!parsedEnd) {
+      parsedEnd = new Date(parsedStart.getTime() + DEFAULT_EVENT_DURATION_MS);
+    }
+
     const seats = parseInt(totalSeats) || 100;
     const event = new Event({
       title: title.trim(),
       description: description.trim(),
       category: category.trim(),
       date: date.trim(),
+      startDateTime: parsedStart,
+      endDateTime: parsedEnd,
       location: location.trim(),
       price: Math.max(0, parseFloat(price) || 0),
       totalSeats: seats,
@@ -358,7 +615,7 @@ eventsRouter.post('/', authenticate, requireRole('ORGANIZER', 'ADMIN'), async (r
       status: 'PENDING_APPROVAL',
     });
     await event.save();
-    res.status(201).json(event);
+    res.status(201).json(formatEventJson(event));
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
@@ -372,6 +629,26 @@ eventsRouter.put('/:id', authenticate, requireRole('ORGANIZER', 'ADMIN'), async 
     if (event.organizerId.toString() !== req.user.id && req.user.role !== 'ADMIN') {
       return res.status(403).json({ message: 'Forbidden – not your event' });
     }
+
+    const timing = getEventTiming(event);
+    if (timing.isExpired) {
+      if (req.body.date !== undefined || req.body.price !== undefined || req.body.totalSeats !== undefined) {
+        return res.status(400).json({ message: 'Cannot edit date, price, or seats of an expired event.' });
+      }
+    }
+
+    if (req.body.date !== undefined) {
+      const parsedStart = parseEventDate(req.body.date);
+      if (!parsedStart || isNaN(parsedStart.getTime())) {
+        return res.status(400).json({ message: 'Invalid event date format' });
+      }
+      if (parsedStart.getTime() <= Date.now()) {
+        return res.status(400).json({ message: 'Event date and time must be in the future.' });
+      }
+      event.startDateTime = parsedStart;
+      event.endDateTime = new Date(parsedStart.getTime() + DEFAULT_EVENT_DURATION_MS);
+    }
+
     const allowed = ['title', 'description', 'category', 'date', 'location', 'price', 'totalSeats', 'imageUrl'];
     allowed.forEach((f) => {
       if (req.body[f] !== undefined) event[f] = req.body[f];
@@ -385,7 +662,7 @@ eventsRouter.put('/:id', authenticate, requireRole('ORGANIZER', 'ADMIN'), async 
 
     event.status = 'PENDING_APPROVAL'; // re-approval required after edit
     await event.save();
-    res.json(event);
+    res.json(formatEventJson(event));
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
@@ -398,6 +675,16 @@ eventsRouter.delete('/:id', authenticate, requireRole('ORGANIZER', 'ADMIN'), asy
     if (!event) return res.status(404).json({ message: 'Event not found' });
     if (event.organizerId.toString() !== req.user.id && req.user.role !== 'ADMIN') {
       return res.status(403).json({ message: 'Forbidden – not your event' });
+    }
+
+    const timing = getEventTiming(event);
+    if (timing.isExpired) {
+      const hasBookings = await Booking.exists({ eventId: event._id });
+      if (hasBookings) {
+        return res.status(400).json({
+          message: 'Cannot delete an expired event with booking history. Event history must be preserved.',
+        });
+      }
     }
 
     // Cancel all confirmed/pending bookings and issue mock refunds
@@ -453,6 +740,15 @@ paymentsRouter.post('/order', async (req, res) => {
     if (!event) return res.status(404).json({ message: 'Event not found' });
     if (event.status !== 'PUBLISHED') {
       return res.status(400).json({ message: 'Event is not published for booking' });
+    }
+
+    // Expiry and started checks
+    const timing = getEventTiming(event);
+    if (timing.isExpired) {
+      return res.status(400).json({ message: 'This event has ended' });
+    }
+    if (!ALLOW_BOOKING_AFTER_START && timing.isStarted) {
+      return res.status(400).json({ message: 'This event has ended' });
     }
 
     // Recalculate total amount strictly from DB event price (never trust client)
@@ -554,7 +850,7 @@ paymentsRouter.post('/order', async (req, res) => {
   }
 });
 
-// POST /api/payments/confirm – Confirms payment result (Idempotent)
+// POST /api/payments/confirm – Confirms payment result (Idempotent & Re-checks Expiry)
 paymentsRouter.post('/confirm', async (req, res) => {
   try {
     const { paymentId, result, gatewayToken } = req.body;
@@ -589,16 +885,26 @@ paymentsRouter.post('/confirm', async (req, res) => {
       });
     }
 
-    // ─── Check Expiration ───────────────────────────────────────────────────
+    // ─── Re-check Event Expiry (so orders created earlier cannot confirm after event ends) ───
+    const event = await Event.findById(booking.eventId);
+    if (!event) return res.status(404).json({ message: 'Event not found' });
+    const timing = getEventTiming(event);
+    if (timing.isExpired) {
+      booking.status = 'CANCELLED';
+      payment.status = 'FAILED';
+      event.availableSeats = Math.min(event.totalSeats, event.availableSeats + booking.ticketCount);
+      await event.save();
+      await booking.save();
+      await payment.save();
+      return res.status(400).json({ message: 'This event has ended' });
+    }
+
+    // ─── Check Expiration of 15m window ───────────────────────────────────────
     if (booking.expiresAt && booking.expiresAt < new Date()) {
       booking.status = 'CANCELLED';
       payment.status = 'FAILED';
-      // Release held seats
-      const event = await Event.findById(booking.eventId);
-      if (event) {
-        event.availableSeats = Math.min(event.totalSeats, event.availableSeats + booking.ticketCount);
-        await event.save();
-      }
+      event.availableSeats = Math.min(event.totalSeats, event.availableSeats + booking.ticketCount);
+      await event.save();
       await booking.save();
       await payment.save();
       return res.status(400).json({ message: 'Order expired. Reserved seats have been released.' });
@@ -608,12 +914,8 @@ paymentsRouter.post('/confirm', async (req, res) => {
     if (result.toUpperCase() === 'FAILURE') {
       payment.status = 'FAILED';
       booking.status = 'CANCELLED';
-      // Release held seats
-      const event = await Event.findById(booking.eventId);
-      if (event) {
-        event.availableSeats = Math.min(event.totalSeats, event.availableSeats + booking.ticketCount);
-        await event.save();
-      }
+      event.availableSeats = Math.min(event.totalSeats, event.availableSeats + booking.ticketCount);
+      await event.save();
       await booking.save();
       await payment.save();
       return res.json({ message: 'Payment failed. Booking cancelled and seats released.', booking, payment });
@@ -630,11 +932,8 @@ paymentsRouter.post('/confirm', async (req, res) => {
       if (!verification.success) {
         payment.status = 'FAILED';
         booking.status = 'CANCELLED';
-        const event = await Event.findById(booking.eventId);
-        if (event) {
-          event.availableSeats = Math.min(event.totalSeats, event.availableSeats + booking.ticketCount);
-          await event.save();
-        }
+        event.availableSeats = Math.min(event.totalSeats, event.availableSeats + booking.ticketCount);
+        await event.save();
         await booking.save();
         await payment.save();
         return res.status(400).json({ message: verification.error || 'Payment verification failed' });
@@ -668,32 +967,112 @@ paymentsRouter.post('/confirm', async (req, res) => {
 const bookingsRouter = express.Router();
 bookingsRouter.use(authenticate);
 
-// GET /api/bookings/my-tickets – user's tickets (only CONFIRMED & USED)
-bookingsRouter.get('/my-tickets', async (req, res) => {
+// POST /api/bookings – Direct booking endpoint with expiry rejection
+bookingsRouter.post('/', async (req, res) => {
   try {
-    const bookings = await Booking.find({
+    const { eventId, ticketCount } = req.body;
+    const count = parseInt(ticketCount || req.body.quantity);
+    if (!eventId || !count || count <= 0) {
+      return res.status(400).json({ message: 'Valid eventId and ticketCount (>= 1) are required' });
+    }
+
+    const event = await Event.findById(eventId);
+    if (!event) return res.status(404).json({ message: 'Event not found' });
+    if (event.status !== 'PUBLISHED') {
+      return res.status(400).json({ message: 'Event is not published for booking' });
+    }
+
+    const timing = getEventTiming(event);
+    if (timing.isExpired) {
+      return res.status(400).json({ message: 'This event has ended' });
+    }
+    if (!ALLOW_BOOKING_AFTER_START && timing.isStarted) {
+      return res.status(400).json({ message: 'This event has ended' });
+    }
+
+    if (event.availableSeats < count) {
+      return res.status(400).json({
+        message: `Only ${event.availableSeats} seat(s) available. Cannot book ${count} seat(s).`,
+      });
+    }
+
+    const totalPrice = event.price * count;
+    event.availableSeats -= count;
+    await event.save();
+
+    const booking = new Booking({
+      eventId: event._id,
       userId: req.user.id,
-      status: { $in: ['CONFIRMED', 'USED', 'CANCELLED'] },
-    })
-      .populate('eventId', 'title date location imageUrl price')
-      .sort({ createdAt: -1 });
-    res.json(bookings);
+      ticketCount: count,
+      totalPrice,
+      status: 'CONFIRMED',
+      expiresAt: null,
+    });
+    booking.qrCodeHash = generateQrHash(booking._id.toString(), req.user.id);
+    await booking.save();
+
+    const resp = booking.toObject();
+    resp.isExpired = false;
+    resp.ticketState = 'ACTIVE';
+    res.status(201).json(resp);
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
-// GET /api/bookings – all bookings for current user
-bookingsRouter.get('/', async (req, res) => {
+// Helper for user bookings list (Active upcoming first, then expired/used)
+const handleUserBookings = async (req, res) => {
   try {
-    const bookings = await Booking.find({ userId: req.user.id })
-      .populate('eventId', 'title date location imageUrl price')
+    const bookings = await Booking.find({
+      userId: req.user.id,
+      status: { $in: ['CONFIRMED', 'USED', 'CANCELLED'] },
+    })
+      .populate('eventId', 'title date location imageUrl price startDateTime endDateTime')
       .sort({ createdAt: -1 });
-    res.json(bookings);
+
+    const activeList = [];
+    const pastList = [];
+
+    bookings.forEach((b) => {
+      const bObj = b.toObject();
+      let eventTiming = null;
+      if (b.eventId) {
+        eventTiming = getEventTiming(b.eventId);
+        bObj.eventId = formatEventJson(b.eventId);
+      }
+
+      const ticketState = computeBookingTicketState(b, b.eventId);
+      bObj.ticketState = ticketState;
+      bObj.isExpired = eventTiming ? eventTiming.isExpired : false;
+
+      if (ticketState === 'ACTIVE') {
+        activeList.push({ booking: bObj, startMs: eventTiming ? eventTiming.startMs : 0 });
+      } else {
+        pastList.push({ booking: bObj, startMs: eventTiming ? eventTiming.startMs : 0 });
+      }
+    });
+
+    // Active tickets: soonest first (ascending by event start date)
+    activeList.sort((a, b) => a.startMs - b.startMs);
+
+    // Past tickets: most recent first (descending by event start date)
+    pastList.sort((a, b) => b.startMs - a.startMs);
+
+    const ordered = [...activeList.map((x) => x.booking), ...pastList.map((x) => x.booking)];
+    res.json(ordered);
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
-});
+};
+
+// GET /api/bookings/mine
+bookingsRouter.get('/mine', handleUserBookings);
+
+// GET /api/bookings/my-tickets (backward compatibility)
+bookingsRouter.get('/my-tickets', handleUserBookings);
+
+// GET /api/bookings (backward compatibility)
+bookingsRouter.get('/', handleUserBookings);
 
 // GET /api/bookings/:id
 bookingsRouter.get('/:id', async (req, res) => {
@@ -703,13 +1082,25 @@ bookingsRouter.get('/:id', async (req, res) => {
     if (booking.userId.toString() !== req.user.id && req.user.role !== 'ADMIN') {
       return res.status(403).json({ message: 'Forbidden' });
     }
-    res.json(booking);
+
+    const bObj = booking.toObject();
+    if (booking.eventId) {
+      const timing = getEventTiming(booking.eventId);
+      bObj.isExpired = timing.isExpired;
+      bObj.ticketState = computeBookingTicketState(booking, booking.eventId);
+      bObj.eventId = formatEventJson(booking.eventId);
+    } else {
+      bObj.isExpired = false;
+      bObj.ticketState = computeBookingTicketState(booking, null);
+    }
+
+    res.json(bObj);
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
-// PATCH /api/bookings/:id/cancel – Cancel booking with 48-hour check
+// PATCH /api/bookings/:id/cancel – Cancel booking with start-time & 48-hour check
 bookingsRouter.patch('/:id/cancel', async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id);
@@ -726,15 +1117,19 @@ bookingsRouter.patch('/:id/cancel', async (req, res) => {
     const event = await Event.findById(booking.eventId);
     if (!event) return res.status(404).json({ message: 'Event not found' });
 
+    const timing = getEventTiming(event);
+    if (timing.isStarted || timing.isEnded) {
+      return res.status(400).json({
+        message: 'Cancellation not allowed. The event has already started or ended.',
+      });
+    }
+
     // 48-hour cancellation policy check
-    const eventTime = new Date(event.date).getTime();
-    if (!isNaN(eventTime)) {
-      const diffHours = (eventTime - Date.now()) / (1000 * 60 * 60);
-      if (diffHours < 48) {
-        return res.status(400).json({
-          message: 'Cancellation not allowed. Cancellations must be made at least 48 hours before the event start time.',
-        });
-      }
+    const diffHours = (timing.startMs - Date.now()) / (1000 * 60 * 60);
+    if (diffHours < 48) {
+      return res.status(400).json({
+        message: 'Cancellation not allowed. Cancellations must be made at least 48 hours before the event start time.',
+      });
     }
 
     booking.status = 'CANCELLED';
@@ -777,7 +1172,7 @@ bookingsRouter.patch('/:id/cancel', async (req, res) => {
 const organizerRouter = express.Router();
 organizerRouter.use(authenticate, requireRole('ORGANIZER', 'ADMIN'));
 
-// POST /api/organizer/check-in – QR or Manual Booking ID check-in
+// POST /api/organizer/check-in – QR or Manual Booking ID check-in with expiry rejection
 organizerRouter.post('/check-in', async (req, res) => {
   try {
     const { qrCodeHash, bookingId } = req.body;
@@ -786,7 +1181,7 @@ organizerRouter.post('/check-in', async (req, res) => {
     }
 
     const query = qrCodeHash ? { qrCodeHash } : { _id: bookingId };
-    const booking = await Booking.findOne(query).populate('eventId', 'title date location organizerId');
+    const booking = await Booking.findOne(query).populate('eventId', 'title date location organizerId startDateTime endDateTime');
     if (!booking) {
       return res.status(404).json({ message: 'Ticket not found. Invalid QR code or Booking ID.' });
     }
@@ -807,6 +1202,12 @@ organizerRouter.post('/check-in', async (req, res) => {
       return res.status(400).json({ message: 'Warning: This ticket is PENDING payment and not confirmed.' });
     }
 
+    // Expiry check
+    const timing = getEventTiming(booking.eventId);
+    if (timing.isExpired) {
+      return res.status(400).json({ message: 'Event has ended. Check-in is closed.' });
+    }
+
     if (booking.isCheckedIn || booking.status === 'USED') {
       return res.status(409).json({
         message: `Warning: Already checked in on ${booking.checkedInAt ? new Date(booking.checkedInAt).toLocaleString() : 'earlier date'}.`,
@@ -823,6 +1224,74 @@ organizerRouter.post('/check-in', async (req, res) => {
       message: 'Check-in successful! Entry approved.',
       booking,
     });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// GET /api/organizer/attendees - list attendees for organizer's events with summary
+organizerRouter.get('/attendees', async (req, res) => {
+  try {
+    const { eventId } = req.query;
+    let eventIds;
+
+    if (req.user.role === 'ADMIN' && !eventId) {
+      const allEvents = await Event.find().select('_id');
+      eventIds = allEvents.map((e) => e._id);
+    } else {
+      const query = { organizerId: req.user.id };
+      if (eventId) query._id = eventId;
+      const organizerEvents = await Event.find(query).select('_id');
+      eventIds = organizerEvents.map((e) => e._id);
+    }
+
+    const filter = {
+      eventId: { $in: eventIds },
+      status: { $in: ['CONFIRMED', 'USED'] },
+    };
+
+    const bookings = await Booking.find(filter)
+      .populate('userId', 'name email phoneNumber')
+      .populate('eventId', 'title date location price startDateTime endDateTime')
+      .sort({ createdAt: -1 });
+
+    let totalBooked = 0;
+    let checkedInCount = 0;
+
+    const attendees = bookings.map((b) => {
+      const quantity = b.ticketCount || 1;
+      const checkedIn = b.isCheckedIn || b.status === 'USED';
+      totalBooked += quantity;
+      if (checkedIn) checkedInCount += quantity;
+
+      const timing = b.eventId ? getEventTiming(b.eventId) : null;
+
+      return {
+        bookingId: b._id.toString(),
+        eventId: b.eventId?._id?.toString() || '',
+        eventTitle: b.eventId?.title || 'Unknown Event',
+        eventDate: b.eventId?.date || '',
+        eventLocation: b.eventId?.location || '',
+        userName: b.userId?.name || 'Attendee',
+        userEmail: b.userId?.email || '',
+        userPhone: b.userId?.phoneNumber || '',
+        ticketCount: quantity,
+        quantity,
+        totalPrice: b.totalPrice,
+        status: b.status,
+        isCheckedIn: checkedIn,
+        checkedIn,
+        checkedInAt: b.checkedInAt ? b.checkedInAt.toISOString() : null,
+        bookedAt: b.createdAt ? b.createdAt.toISOString() : null,
+        qrCodeHash: b.qrCodeHash || '',
+        isExpired: timing ? timing.isExpired : false,
+      };
+    });
+
+    const noShowCount = Math.max(0, totalBooked - checkedInCount);
+
+    // If eventId was explicitly requested or client expects summary
+    res.json(attendees);
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }

@@ -2,6 +2,7 @@ package com.example.eventpulse.data.repository
 
 import com.example.eventpulse.data.local.TicketDao
 import com.example.eventpulse.data.local.entities.TicketEntity
+import com.example.eventpulse.data.model.Attendee
 import com.example.eventpulse.data.model.Booking
 import com.example.eventpulse.data.model.ConfirmPaymentRequest
 import com.example.eventpulse.data.model.ConfirmPaymentResponse
@@ -183,6 +184,23 @@ class BookingRepository(
                 } else if (!bookingId.isNullOrBlank()) {
                     ticketDao.markCheckedIn(bookingId)
                 }
+                Result.success(response.body()!!)
+            } else {
+                val err = response.errorBody()?.string() ?: response.message()
+                Result.failure(Exception(err))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Fetches attendees for the organizer via `GET /api/organizer/attendees`.
+     */
+    suspend fun getOrganizerAttendees(eventId: String? = null): Result<List<Attendee>> {
+        return try {
+            val response = api.getOrganizerAttendees(eventId)
+            if (response.isSuccessful && response.body() != null) {
                 Result.success(response.body()!!)
             } else {
                 val err = response.errorBody()?.string() ?: response.message()

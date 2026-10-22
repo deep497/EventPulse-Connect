@@ -21,6 +21,19 @@ class SessionManager(private val context: Context) {
         private val USER_NAME_KEY = stringPreferencesKey("user_name")
         private val USER_EMAIL_KEY = stringPreferencesKey("user_email")
         private val DARK_MODE_KEY = androidx.datastore.preferences.core.booleanPreferencesKey("dark_mode")
+        private val FAVORITES_KEY = androidx.datastore.preferences.core.stringSetPreferencesKey("favorite_events")
+    }
+
+    suspend fun saveFavoriteEventIds(ids: Set<String>) {
+        context.dataStore.edit { preferences ->
+            preferences[FAVORITES_KEY] = ids
+        }
+    }
+
+    fun getFavoriteEventIds(): Flow<Set<String>> {
+        return context.dataStore.data.map { preferences ->
+            preferences[FAVORITES_KEY] ?: emptySet()
+        }
     }
 
     suspend fun setDarkMode(isDark: Boolean) {
@@ -92,7 +105,11 @@ class SessionManager(private val context: Context) {
 
     suspend fun clearSession() {
         context.dataStore.edit { preferences ->
-            preferences.clear()
+            preferences.remove(JWT_TOKEN_KEY)
+            preferences.remove(USER_ROLE_KEY)
+            preferences.remove(USER_ID_KEY)
+            preferences.remove(USER_NAME_KEY)
+            preferences.remove(USER_EMAIL_KEY)
         }
     }
 }

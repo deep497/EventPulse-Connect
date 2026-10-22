@@ -2,6 +2,7 @@ package com.example.eventpulse.ui.user
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.eventpulse.data.local.SessionManager
 import com.example.eventpulse.data.model.Booking
 import com.example.eventpulse.data.model.Event
 import com.example.eventpulse.data.repository.BookingRepository
@@ -16,7 +17,7 @@ data class UserUiState(
     val locationText: String = "Current Location",
     val searchQuery: String = "",
     val selectedCategory: String = "All",
-    val categories: List<String> = listOf("All", "Music", "Tech", "Art", "Sports"),
+    val categories: List<String> = listOf("All", "Music", "Tech", "Art", "Sports", "Spirituality"),
     val recommendedEvents: List<Event> = emptyList(),
     val favoriteEventIds: Set<String> = emptySet(),
     val selectedEvent: Event? = null,
@@ -27,7 +28,8 @@ data class UserUiState(
 
 class UserViewModel(
     private val eventRepository: EventRepository,
-    private val bookingRepository: BookingRepository
+    private val bookingRepository: BookingRepository,
+    private val sessionManager: SessionManager? = null
 ) : ViewModel() {
 
     private val _userUiState = MutableStateFlow(UserUiState())
@@ -35,43 +37,63 @@ class UserViewModel(
 
     init {
         loadEvents()
+        loadFavorites()
+    }
+
+    private fun loadFavorites() {
+        if (sessionManager != null) {
+            viewModelScope.launch {
+                sessionManager.getFavoriteEventIds().collect { ids ->
+                    _userUiState.update { it.copy(favoriteEventIds = ids) }
+                }
+            }
+        }
     }
 
     fun toggleFavorite(eventId: String) {
-        _userUiState.update { current ->
-            val updated = if (current.favoriteEventIds.contains(eventId)) {
-                current.favoriteEventIds - eventId
-            } else {
-                current.favoriteEventIds + eventId
+        val currentIds = _userUiState.value.favoriteEventIds
+        val updated = if (currentIds.contains(eventId)) {
+            currentIds - eventId
+        } else {
+            currentIds + eventId
+        }
+        _userUiState.update { it.copy(favoriteEventIds = updated) }
+        if (sessionManager != null) {
+            viewModelScope.launch {
+                sessionManager.saveFavoriteEventIds(updated)
             }
-            current.copy(favoriteEventIds = updated)
         }
     }
 
     fun updateSearchQuery(query: String) {
         _userUiState.update { it.copy(searchQuery = query) }
-        // TODO: Implement search filtering
+        val cat = _userUiState.value.selectedCategory.let { if (it == "All") null else it }
+        val search = if (query.isBlank()) null else query.trim()
+        loadEvents(category = cat, search = search)
     }
 
     fun updateSelectedCategory(category: String) {
         _userUiState.update { it.copy(selectedCategory = category) }
-        // TODO: Implement category filtering
+        val cat = if (category == "All") null else category
+        val search = _userUiState.value.searchQuery.let { if (it.isBlank()) null else it.trim() }
+        loadEvents(category = cat, search = search)
     }
 
     fun updateLocation(location: String) {
         _userUiState.update { it.copy(locationText = location) }
     }
 
-    fun loadEvents() {
+    fun loadEvents(category: String? = null, search: String? = null) {
         viewModelScope.launch {
             _userUiState.update { it.copy(isLoading = true, errorMessage = null) }
             
-            val result = eventRepository.getEvents()
+            val result = eventRepository.getEvents(status = "PUBLISHED", category = category, search = search)
             result.fold(
                 onSuccess = { events ->
+                    val activeEvents = events.filter { !it.isExpired }
                     _userUiState.update { it.copy(
                         isLoading = false,
-                        recommendedEvents = events
+                        recommendedEvents = activeEvents
                     )}
                 },
                 onFailure = { exception ->

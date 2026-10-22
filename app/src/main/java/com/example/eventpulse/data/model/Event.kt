@@ -20,6 +20,10 @@ data class Event(
      * New events default to `PENDING_APPROVAL`.
      */
     val status: String = "PENDING_APPROVAL",
+    val isExpired: Boolean = false,
+    val timeStatus: String = "UPCOMING",
+    val startDateTime: String? = null,
+    val endDateTime: String? = null,
     val createdAt: String = ""
 ) {
     val organizerIdString: String

@@ -90,7 +90,7 @@ fun CheckoutScreen(
                     )
                 },
                 navigationIcon = {
-                    if (uiState.checkoutStep == CheckoutStep.ORDER_SUMMARY) {
+                    if (uiState.checkoutStep == CheckoutStep.ORDER_SUMMARY || uiState.checkoutStep == CheckoutStep.PAYMENT_FAILURE) {
                         IconButton(onClick = { navController.popBackStack() }) {
                             Icon(
                                 painter = painterResource(id = android.R.drawable.ic_menu_revert),
@@ -610,15 +610,21 @@ private fun PaymentFailureContent(
                     )
                 }
 
+                val isEventEnded = uiState.resultMessage?.contains("ended", ignoreCase = true) == true
+
                 Text(
-                    text = "Payment Not Completed",
+                    text = if (isEventEnded) "Event Has Ended" else "Payment Not Completed",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.ExtraBold,
                     color = if (isDark) UserDarkTextPrimary else UserLightTextPrimary
                 )
 
                 Text(
-                    text = uiState.resultMessage ?: "The transaction failed or was cancelled. Any held seats have been released.",
+                    text = if (isEventEnded) {
+                        "This event has concluded and ticket booking is closed. Please explore upcoming events."
+                    } else {
+                        uiState.resultMessage ?: "The transaction failed or was cancelled. Any held seats have been released."
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center,
                     color = if (isDark) UserDarkTextSecondary else UserLightTextSecondary
@@ -626,17 +632,19 @@ private fun PaymentFailureContent(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                GradientButton(
-                    text = "Try Again",
-                    onClick = onRetry,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                if (!isEventEnded) {
+                    GradientButton(
+                        text = "Try Again",
+                        onClick = onRetry,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
 
                 OutlinedButton(
                     onClick = onCancel,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Return to Event")
+                    Text(if (isEventEnded) "Return to Events" else "Return to Event")
                 }
             }
         }

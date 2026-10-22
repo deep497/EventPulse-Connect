@@ -359,19 +359,18 @@ fun NeonEventCard(
                     .background(bannerGradient)
             ) {
                 // Heart Favorite button on top-right
-                Box(
+                IconButton(
+                    onClick = onToggleFavorite,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(10.dp)
-                        .size(36.dp)
+                        .padding(8.dp)
+                        .size(38.dp)
                         .clip(CircleShape)
-                        .background(Color(0x99000000))
-                        .clickable(onClick = onToggleFavorite),
-                    contentAlignment = Alignment.Center
+                        .background(Color(0xCC000000))
                 ) {
                     Text(
                         text = if (isFavorite) "❤️" else "🤍",
-                        style = MaterialTheme.typography.bodyMedium
+                        fontSize = 18.sp
                     )
                 }
 

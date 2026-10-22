@@ -1,5 +1,6 @@
 package com.example.eventpulse.data.remote
 
+import com.example.eventpulse.data.model.Attendee
 import com.example.eventpulse.data.model.Booking
 import com.example.eventpulse.data.model.ChatRequest
 import com.example.eventpulse.data.model.ChatResponse
@@ -84,6 +85,10 @@ interface EventPulseApi {
     /** POST /api/organizer/check-in – body: { qrCodeHash? or bookingId? } */
     @POST("organizer/check-in")
     suspend fun checkIn(@Body body: Map<String, String>): Response<Map<String, Any>>
+
+    /** GET /api/organizer/attendees */
+    @GET("organizer/attendees")
+    suspend fun getOrganizerAttendees(@Query("eventId") eventId: String? = null): Response<List<Attendee>>
 
     // ── Admin endpoints ─────────────────────────────────────────────────────────
     /** GET /api/admin/pending-events */

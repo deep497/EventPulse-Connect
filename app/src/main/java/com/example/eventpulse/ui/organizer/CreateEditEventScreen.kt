@@ -6,6 +6,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -13,6 +14,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import com.example.eventpulse.data.model.Event
+import com.example.eventpulse.ui.components.ExpiredBadge
+import com.example.eventpulse.ui.components.expiredStyle
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -26,6 +31,27 @@ fun CreateEditEventScreen(
 
     val existingEvent = remember(eventId, uiState.managedEvents) {
         if (isEditMode) uiState.managedEvents.find { it.id == eventId } else null
+    }
+
+    val isExpiredEvent = existingEvent?.isExpired == true
+
+    fun isDateInFuture(dateStr: String): Boolean {
+        val trimmed = dateStr.trim()
+        if (trimmed.length < 10) return true
+        val formats = listOf(
+            SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US),
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm", Locale.US),
+            SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        )
+        for (fmt in formats) {
+            try {
+                val parsed = fmt.parse(trimmed)
+                if (parsed != null) {
+                    return parsed.time > System.currentTimeMillis()
+                }
+            } catch (_: Exception) {}
+        }
+        return true
     }
 
     var title by remember { mutableStateOf("") }
@@ -54,7 +80,7 @@ fun CreateEditEventScreen(
         }
     }
 
-    val categories = listOf("Music", "Tech", "Art", "Sports", "Business", "Other")
+    val categories = listOf("Music", "Tech", "Art", "Sports", "Spirituality", "Business", "Other")
 
     // Delete confirmation dialog
     if (showDeleteConfirmDialog && eventId != null) {
@@ -107,11 +133,33 @@ fun CreateEditEventScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                text = if (isEditMode) "Update event details (will require re-approval)" else "Fill in event details for admin approval",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            if (isExpiredEvent) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .expiredStyle(true)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        ExpiredBadge(text = "Ended")
+                        Text(
+                            text = "This event has already ended and cannot be edited. Its date, price, and event history are preserved.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            } else {
+                Text(
+                    text = if (isEditMode) "Update event details (will require re-approval)" else "Fill in event details for admin approval",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
             // Title
             OutlinedTextField(
@@ -178,6 +226,8 @@ fun CreateEditEventScreen(
                 shape = RoundedCornerShape(12.dp)
             )
 
+            val isPastDate = date.isNotBlank() && !isDateInFuture(date)
+
             // Date & Time
             OutlinedTextField(
                 value = date,
@@ -186,7 +236,12 @@ fun CreateEditEventScreen(
                 placeholder = { Text("e.g. 2026-11-15 18:00") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                enabled = !isExpiredEvent,
+                isError = isPastDate,
+                supportingText = if (isPastDate) {
+                    { Text("Event date & time must be in the future.", color = MaterialTheme.colorScheme.error) }
+                } else null
             )
 
             // Price & Capacity
@@ -201,6 +256,7 @@ fun CreateEditEventScreen(
                     placeholder = { Text("0 for Free") },
                     modifier = Modifier.weight(1f),
                     singleLine = true,
+                    enabled = !isExpiredEvent,
                     shape = RoundedCornerShape(12.dp)
                 )
 
@@ -211,6 +267,7 @@ fun CreateEditEventScreen(
                     placeholder = { Text("100") },
                     modifier = Modifier.weight(1f),
                     singleLine = true,
+                    enabled = !isExpiredEvent,
                     shape = RoundedCornerShape(12.dp)
                 )
             }
@@ -223,6 +280,7 @@ fun CreateEditEventScreen(
                 placeholder = { Text("https://images.unsplash.com/...") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
+                enabled = !isExpiredEvent,
                 shape = RoundedCornerShape(12.dp)
             )
 
@@ -231,12 +289,12 @@ fun CreateEditEventScreen(
             val parsedPrice = price.toDoubleOrNull() ?: 0.0
             val parsedCapacity = capacity.toIntOrNull() ?: 100
             val isFormValid = title.isNotBlank() && description.isNotBlank() &&
-                    venue.isNotBlank() && date.isNotBlank() && parsedCapacity > 0
+                    venue.isNotBlank() && date.isNotBlank() && !isPastDate && parsedCapacity > 0
 
             // Submit Button
             Button(
                 onClick = {
-                    if (isFormValid) {
+                    if (isFormValid && !isExpiredEvent) {
                         val eventPayload = Event(
                             id = eventId ?: "",
                             title = title.trim(),
@@ -259,11 +317,15 @@ fun CreateEditEventScreen(
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = isFormValid,
+                enabled = isFormValid && !isExpiredEvent,
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text(
-                    text = if (isEditMode) "Update & Submit for Review" else "Create & Submit for Review",
+                    text = when {
+                        isExpiredEvent -> "Event Ended (Locked)"
+                        isEditMode -> "Update & Submit for Review"
+                        else -> "Create & Submit for Review"
+                    },
                     modifier = Modifier.padding(vertical = 4.dp),
                     fontWeight = FontWeight.Bold
                 )

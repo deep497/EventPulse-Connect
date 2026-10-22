@@ -27,6 +27,8 @@ import com.example.eventpulse.ui.authViewModel
 import com.example.eventpulse.ui.chat.AiChatBottomSheet
 import com.example.eventpulse.ui.chatViewModel
 import com.example.eventpulse.ui.components.DarkLightModeToggle
+import com.example.eventpulse.ui.components.ExpiredBadge
+import com.example.eventpulse.ui.components.expiredStyle
 import com.example.eventpulse.ui.components.GlassCard
 import com.example.eventpulse.ui.navigation.Screen
 import com.example.eventpulse.ui.theme.*
@@ -190,7 +192,7 @@ fun OrganizerDashboardScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        // Card 1: Tickets sold
+                        // Card 1: Upcoming Events count
                         GlassCard(
                             modifier = Modifier.weight(1f)
                         ) {
@@ -201,7 +203,57 @@ fun OrganizerDashboardScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = "Tickets sold",
+                                        text = "Upcoming Events",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = if (isDark) OrgDarkTextSecondary else OrgLightTextSecondary
+                                    )
+                                    // Status pill
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(if (uiState.upcomingEventsCount > 0) StatusPublishedBg else Color(0x1A888888))
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = if (uiState.upcomingEventsCount > 0) "Active" else "None",
+                                            color = if (uiState.upcomingEventsCount > 0) StatusPublished else Color.Gray,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                Text(
+                                    text = "${uiState.upcomingEventsCount}",
+                                    style = MaterialTheme.typography.headlineLarge.copy(fontSize = 26.sp),
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = if (isDark) OrgDarkTextPrimary else OrgLightTextPrimary
+                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Text(
+                                    text = "${uiState.pastEventsCount} past event(s) ended",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isDark) OrgDarkTextTertiary else OrgLightTextTertiary
+                                )
+                            }
+                        }
+
+                        // Card 2: Attendance / Revenue
+                        GlassCard(
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Total Attendance",
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = if (isDark) OrgDarkTextSecondary else OrgLightTextSecondary
                                     )
@@ -213,7 +265,7 @@ fun OrganizerDashboardScreen(
                                             .padding(horizontal = 6.dp, vertical = 2.dp)
                                     ) {
                                         Text(
-                                            text = salesBadge,
+                                            text = if (totalTickets > 0) "Verified" else "0",
                                             color = if (totalTickets > 0) StatusPublished else Color.Gray,
                                             style = MaterialTheme.typography.labelSmall,
                                             fontWeight = FontWeight.Bold
@@ -224,100 +276,19 @@ fun OrganizerDashboardScreen(
                                 Spacer(modifier = Modifier.height(10.dp))
 
                                 Text(
-                                    text = ticketsSoldDisplay,
+                                    text = "${if (uiState.totalAttendance > 0) uiState.totalAttendance else totalTickets}",
                                     style = MaterialTheme.typography.headlineLarge.copy(fontSize = 26.sp),
                                     fontWeight = FontWeight.ExtraBold,
                                     color = if (isDark) OrgDarkTextPrimary else OrgLightTextPrimary
                                 )
 
                                 Spacer(modifier = Modifier.height(8.dp))
-
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text(
-                                        text = salesSubtext,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = if (totalTickets > 0) StatusPublished else (if (isDark) OrgDarkTextTertiary else OrgLightTextTertiary)
-                                    )
-                                    if (totalTickets > 0) {
-                                        // Mini decorative bar chart
-                                        Row(
-                                            horizontalArrangement = Arrangement.spacedBy(2.dp),
-                                            verticalAlignment = Alignment.Bottom,
-                                            modifier = Modifier.height(14.dp)
-                                        ) {
-                                            Box(modifier = Modifier.width(3.dp).height(6.dp).background(RosePlum, RoundedCornerShape(1.dp)))
-                                            Box(modifier = Modifier.width(3.dp).height(10.dp).background(RoyalPlum, RoundedCornerShape(1.dp)))
-                                            Box(modifier = Modifier.width(3.dp).height(14.dp).background(RosePlum, RoundedCornerShape(1.dp)))
-                                            Box(modifier = Modifier.width(3.dp).height(9.dp).background(RoyalPlum, RoundedCornerShape(1.dp)))
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // Card 2: Revenue
-                        GlassCard(
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "Revenue",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = if (isDark) OrgDarkTextSecondary else OrgLightTextSecondary
-                                    )
-                                    // Status pill
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(if (revenue > 0) StatusPublishedBg else Color(0x1A888888))
-                                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                                    ) {
-                                        Text(
-                                            text = revBadge,
-                                            color = if (revenue > 0) StatusPublished else Color.Gray,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(10.dp))
 
                                 Text(
-                                    text = revenueDisplay,
-                                    style = MaterialTheme.typography.headlineLarge.copy(fontSize = 26.sp),
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = if (isDark) OrgDarkTextPrimary else OrgLightTextPrimary
+                                    text = "Revenue: $revenueDisplay",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (revenue > 0) StatusPublished else (if (isDark) OrgDarkTextTertiary else OrgLightTextTertiary)
                                 )
-
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text(
-                                        text = revSubtext,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = if (revenue > 0) StatusPublished else (if (isDark) OrgDarkTextTertiary else OrgLightTextTertiary)
-                                    )
-                                    Icon(
-                                        painter = painterResource(id = android.R.drawable.ic_menu_agenda),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(14.dp),
-                                        tint = if (isDark) OrgDarkTextTertiary else OrgLightTextTertiary
-                                    )
-                                }
                             }
                         }
                     }
@@ -496,16 +467,50 @@ fun OrganizerDashboardScreen(
                         }
                     }
                 } else {
-                    items(uiState.managedEvents) { event ->
-                        NeonManagedEventCard(
-                            event = event,
-                            onEditClick = {
-                                navController.navigate(Screen.CreateEditEvent.createRoute(event.id))
-                            },
-                            onScanClick = {
-                                navController.navigate(Screen.QrScanner.route)
-                            }
-                        )
+                    val upcoming = uiState.upcomingEvents
+                    val past = uiState.pastEvents
+
+                    if (upcoming.isNotEmpty()) {
+                        item {
+                            Text(
+                                text = "Current & Upcoming Events (${upcoming.size})",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isDark) OrgDarkTextPrimary else OrgLightTextPrimary,
+                                modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
+                            )
+                        }
+                        items(upcoming, key = { it.id }) { event ->
+                            NeonManagedEventCard(
+                                event = event,
+                                onEditClick = {
+                                    navController.navigate(Screen.CreateEditEvent.createRoute(event.id))
+                                },
+                                onScanClick = {
+                                    navController.navigate(Screen.QrScanner.route)
+                                }
+                            )
+                        }
+                    }
+
+                    if (past.isNotEmpty()) {
+                        item {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = "Past Events (${past.size})",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isDark) OrgDarkTextSecondary else OrgLightTextSecondary,
+                                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                            )
+                        }
+                        items(past, key = { it.id }) { event ->
+                            NeonManagedEventCard(
+                                event = event,
+                                onEditClick = {},
+                                onScanClick = {}
+                            )
+                        }
                     }
                 }
 
@@ -519,6 +524,7 @@ fun OrganizerDashboardScreen(
 
 /**
  * Managed Event Card with Plum/Rose accents and status pills.
+ * Expired events are greyed out, show "Ended" badge and read-only actions.
  */
 @Composable
 fun NeonManagedEventCard(
@@ -527,6 +533,7 @@ fun NeonManagedEventCard(
     onScanClick: () -> Unit
 ) {
     val isDark = LocalThemeIsDark.current
+    val isExpired = event.isExpired
     val isPublished = event.status == "PUBLISHED"
     val isPending = event.status == "PENDING_APPROVAL"
 
@@ -549,7 +556,9 @@ fun NeonManagedEventCard(
     }
 
     GlassCard(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .expiredStyle(isExpired)
     ) {
         Column(
             modifier = Modifier.padding(16.dp)
@@ -592,34 +601,41 @@ fun NeonManagedEventCard(
                 }
 
                 // Status Badge Pill
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(statusBg)
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        text = statusText,
-                        color = statusColor,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold
+                if (isExpired) {
+                    ExpiredBadge(
+                        text = "Ended",
+                        modifier = Modifier.padding(start = 8.dp)
                     )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(statusBg)
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = statusText,
+                            color = statusColor,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Attendance counter + Progress Bar
+            // Attendance stats: visible on both active and past cards
             val attendeesCount = (event.totalSeats - event.availableSeats).coerceAtLeast(0)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "👥 $attendeesCount attendees",
+                    text = if (isExpired) "👥 $attendeesCount of ${event.totalSeats} attended" else "👥 $attendeesCount booked",
                     style = MaterialTheme.typography.bodySmall,
                     color = if (isDark) OrgDarkTextSecondary else OrgLightTextSecondary,
-                    modifier = Modifier.width(120.dp)
+                    modifier = Modifier.width(150.dp)
                 )
 
                 val progress = if (event.totalSeats > 0) {
@@ -632,7 +648,7 @@ fun NeonManagedEventCard(
                         .weight(1f)
                         .height(6.dp)
                         .clip(RoundedCornerShape(3.dp)),
-                    color = if (isDark) RosePlum else RoyalPlum,
+                    color = if (isExpired) Color.Gray else (if (isDark) RosePlum else RoyalPlum),
                     trackColor = if (isDark) Color(0xFF382337) else PlumBorder
                 )
             }
@@ -640,32 +656,47 @@ fun NeonManagedEventCard(
             Spacer(modifier = Modifier.height(14.dp))
 
             // Action Buttons
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
+            if (isExpired) {
                 OutlinedButton(
-                    onClick = onEditClick,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, if (isDark) OrgDarkBorder else PlumBorder),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = if (isDark) OrgDarkTextPrimary else RoyalPlum
-                    )
+                    onClick = {},
+                    enabled = false,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("Edit")
+                    Text(
+                        text = "Event Ended • Read-Only Summary",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (isDark) OrgDarkTextSecondary else OrgLightTextSecondary
+                    )
                 }
-
-                Button(
-                    onClick = onScanClick,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isDark) RosePlum else RoyalPlum,
-                        contentColor = if (isDark) Color(0xFF171219) else Color.White
-                    )
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Text("Scan QR")
+                    OutlinedButton(
+                        onClick = onEditClick,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, if (isDark) OrgDarkBorder else PlumBorder),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = if (isDark) OrgDarkTextPrimary else RoyalPlum
+                        )
+                    ) {
+                        Text("Edit")
+                    }
+
+                    Button(
+                        onClick = onScanClick,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isDark) RosePlum else RoyalPlum,
+                            contentColor = if (isDark) Color(0xFF171219) else Color.White
+                        )
+                    ) {
+                        Text("Scan QR")
+                    }
                 }
             }
         }

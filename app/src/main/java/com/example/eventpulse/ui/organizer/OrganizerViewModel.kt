@@ -2,6 +2,7 @@ package com.example.eventpulse.ui.organizer
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.eventpulse.data.model.Attendee
 import com.example.eventpulse.data.model.Event
 import com.example.eventpulse.data.repository.BookingRepository
 import com.example.eventpulse.data.repository.EventRepository
@@ -21,11 +22,27 @@ data class OrganizerUiState(
     val totalTicketSales: Int = 0,
     val totalRevenue: Double = 0.0,
     val managedEvents: List<Event> = emptyList(),
+    val attendees: List<Attendee> = emptyList(),
     val selectedEvent: Event? = null,
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val successMessage: String? = null
-)
+) {
+    val upcomingEvents: List<Event>
+        get() = managedEvents.filter { !it.isExpired }
+
+    val pastEvents: List<Event>
+        get() = managedEvents.filter { it.isExpired }
+
+    val upcomingEventsCount: Int
+        get() = upcomingEvents.size
+
+    val pastEventsCount: Int
+        get() = pastEvents.size
+
+    val totalAttendance: Int
+        get() = attendees.count { it.isCheckedIn || it.checkedIn }
+}
 
 class OrganizerViewModel(
     private val eventRepository: EventRepository,
@@ -43,7 +60,7 @@ class OrganizerViewModel(
         viewModelScope.launch {
             _organizerUiState.update { it.copy(isLoading = true, errorMessage = null) }
             
-            val result = eventRepository.getEvents()
+            val result = eventRepository.getOrganizerEvents()
             result.fold(
                 onSuccess = { events ->
                     // Calculate metrics from actual tickets sold (totalSeats - availableSeats)
@@ -56,6 +73,8 @@ class OrganizerViewModel(
                         totalTicketSales = totalSales,
                         totalRevenue = revenue
                     )}
+                    // Also refresh attendees to keep attendance count up to date
+                    loadAttendees()
                 },
                 onFailure = { exception ->
                     _organizerUiState.update { it.copy(
@@ -68,6 +87,27 @@ class OrganizerViewModel(
     }
 
     fun loadManagedEvents() = loadOrganizerEvents()
+
+    fun loadAttendees(eventId: String? = null) {
+        viewModelScope.launch {
+            _organizerUiState.update { it.copy(isLoading = true, errorMessage = null) }
+            val result = bookingRepository.getOrganizerAttendees(eventId)
+            result.fold(
+                onSuccess = { list ->
+                    _organizerUiState.update { it.copy(
+                        isLoading = false,
+                        attendees = list
+                    )}
+                },
+                onFailure = { exception ->
+                    _organizerUiState.update { it.copy(
+                        isLoading = false,
+                        errorMessage = exception.message ?: "Failed to load attendees"
+                    )}
+                }
+            )
+        }
+    }
 
     fun createEvent(event: Event) {
         viewModelScope.launch {

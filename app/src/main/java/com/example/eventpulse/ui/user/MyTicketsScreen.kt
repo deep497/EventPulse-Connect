@@ -22,6 +22,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import com.example.eventpulse.data.model.Booking
+import com.example.eventpulse.ui.components.ExpiredBadge
+import com.example.eventpulse.ui.components.expiredStyle
 import com.example.eventpulse.ui.navigation.Screen
 import com.example.eventpulse.utils.QrCodeGenerator
 import kotlinx.coroutines.launch
@@ -252,17 +254,57 @@ fun MyTicketsScreen(
                     }
                 }
                 else -> {
+                    val upcomingTickets = remember(uiState.bookings) {
+                        uiState.bookings.filter { it.isActiveTicket }
+                    }
+                    val pastTickets = remember(uiState.bookings) {
+                        uiState.bookings.filter { it.isPastTicket }
+                    }
+
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        items(uiState.bookings) { booking ->
-                            TicketItemCard(
-                                booking = booking,
-                                onViewQr = { qrBookingToShow = booking },
-                                onCancel = { bookingToCancel = booking }
-                            )
+                        if (upcomingTickets.isNotEmpty()) {
+                            item {
+                                Text(
+                                    text = "Upcoming Tickets (${upcomingTickets.size})",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
+                                )
+                            }
+                            items(upcomingTickets, key = { it.id }) { booking ->
+                                TicketItemCard(
+                                    booking = booking,
+                                    isPast = false,
+                                    onViewQr = { qrBookingToShow = booking },
+                                    onCancel = { bookingToCancel = booking }
+                                )
+                            }
+                        }
+
+                        if (pastTickets.isNotEmpty()) {
+                            item {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "Past Tickets (${pastTickets.size})",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
+                                )
+                            }
+                            items(pastTickets, key = { it.id }) { booking ->
+                                TicketItemCard(
+                                    booking = booking,
+                                    isPast = true,
+                                    onViewQr = {},
+                                    onCancel = {}
+                                )
+                            }
                         }
                     }
                 }
@@ -274,18 +316,22 @@ fun MyTicketsScreen(
 @Composable
 private fun TicketItemCard(
     booking: Booking,
+    isPast: Boolean,
     onViewQr: () -> Unit,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val statusUpper = booking.status.uppercase()
-    val isConfirmed = statusUpper == "CONFIRMED"
-    val isUsed = statusUpper == "USED"
-    val isCancelled = statusUpper == "CANCELLED"
+    val ticketStateUpper = booking.ticketState.uppercase()
+    val isCancelled = statusUpper == "CANCELLED" || ticketStateUpper == "CANCELLED"
+    val isUsed = statusUpper == "USED" || ticketStateUpper == "USED" || booking.isCheckedIn
+    val isExpired = booking.isExpired || ticketStateUpper == "EXPIRED" || isPast
 
     Card(
-        modifier = modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .expiredStyle(isPast),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isPast) 1.dp else 3.dp),
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(
@@ -293,7 +339,7 @@ private fun TicketItemCard(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            // Header: Title and Status Pill
+            // Header: Title and Status Badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -303,7 +349,8 @@ private fun TicketItemCard(
                     Text(
                         text = booking.eventTitle.ifEmpty { "Event ID: ${booking.eventIdString}" },
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = if (isPast) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
                     )
                     if (booking.eventDate.isNotEmpty()) {
                         Text(
@@ -322,38 +369,55 @@ private fun TicketItemCard(
                     }
                 }
 
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = when {
-                        isConfirmed -> MaterialTheme.colorScheme.primaryContainer
-                        isUsed -> Color(0xFF10B981).copy(alpha = 0.2f)
-                        isCancelled -> MaterialTheme.colorScheme.errorContainer
-                        else -> MaterialTheme.colorScheme.surfaceVariant
-                    },
-                    modifier = Modifier.padding(start = 8.dp)
-                ) {
-                    Text(
-                        text = when {
-                            isConfirmed -> "CONFIRMED"
-                            isUsed -> "CHECKED IN"
-                            isCancelled -> "CANCELLED"
-                            else -> booking.status
-                        },
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = when {
-                            isConfirmed -> MaterialTheme.colorScheme.primary
-                            isUsed -> Color(0xFF10B981)
-                            isCancelled -> MaterialTheme.colorScheme.error
-                            else -> MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
+                if (isPast) {
+                    when {
+                        isCancelled -> {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+                                modifier = Modifier.padding(start = 8.dp)
+                            ) {
+                                Text(
+                                    text = "Cancelled",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
+                        }
+                        isUsed -> {
+                            ExpiredBadge(
+                                text = "Attended",
+                                modifier = Modifier.padding(start = 8.dp)
+                            )
+                        }
+                        else -> {
+                            ExpiredBadge(
+                                text = "Event ended",
+                                modifier = Modifier.padding(start = 8.dp)
+                            )
+                        }
+                    }
+                } else {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        modifier = Modifier.padding(start = 8.dp)
+                    ) {
+                        Text(
+                            text = "ACTIVE",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
-            HorizontalDivider()
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             Spacer(modifier = Modifier.height(12.dp))
 
             // Details row: Tickets count & Total
@@ -364,13 +428,14 @@ private fun TicketItemCard(
             ) {
                 Text(
                     text = "${booking.ticketCount} Ticket${if (booking.ticketCount > 1) "s" else ""}",
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (isPast) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = "Total: ₹${booking.totalPrice.toInt()}",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = if (isPast) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary
                 )
             }
 
@@ -384,20 +449,35 @@ private fun TicketItemCard(
             Spacer(modifier = Modifier.height(14.dp))
 
             // Action Buttons
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                if (!isCancelled) {
+            if (isPast) {
+                OutlinedButton(
+                    onClick = {},
+                    enabled = false,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text(
+                        text = when {
+                            isCancelled -> "Booking Cancelled"
+                            isUsed -> "Ticket Attended"
+                            else -> "Event Ended • Pass Inactive"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     Button(
                         onClick = onViewQr,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text(if (isUsed) "View Pass" else "Show QR Pass")
+                        Text("Show QR Pass")
                     }
-                }
 
-                if (isConfirmed) {
                     OutlinedButton(
                         onClick = onCancel,
                         colors = ButtonDefaults.outlinedButtonColors(

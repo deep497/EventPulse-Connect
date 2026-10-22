@@ -14,9 +14,17 @@ data class Booking(
     val isCheckedIn: Boolean = false,
     val checkedInAt: String? = null,
     val expiresAt: String? = null,
+    val isExpired: Boolean = false,
+    /** Server-computed ticket state: ACTIVE | USED | EXPIRED | CANCELLED */
+    val ticketState: String = "ACTIVE",
     /** ISO-8601 timestamp from MongoDB `createdAt`. */
     val createdAt: String = ""
 ) {
+    val isActiveTicket: Boolean
+        get() = ticketState == "ACTIVE" && !isExpired && status == "CONFIRMED" && !isCheckedIn
+
+    val isPastTicket: Boolean
+        get() = !isActiveTicket
     val eventIdString: String
         get() = when (eventId) {
             is String -> eventId
